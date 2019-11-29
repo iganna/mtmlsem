@@ -15,7 +15,7 @@ A.A.Igolkina et al., *Multi-trait multi-locus SEM model discriminates SNPs of di
 
 ## Authors
 
-**Anna Igolkina** developed the BernMix package, [e-mail](mailto:igolkinaanna11@gmail.com).    
+**Anna Igolkina** [e-mail](mailto:igolkinaanna11@gmail.com).    
 
 
 ## License information
