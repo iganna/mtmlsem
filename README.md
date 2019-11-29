@@ -20,5 +20,5 @@ A.A.Igolkina et al., *Multi-trait multi-locus SEM model discriminates SNPs of di
 
 ## License information
 
-The BernMix package is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Scripts licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
