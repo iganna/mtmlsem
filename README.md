@@ -9,6 +9,14 @@ There are a plethora of methods for genome-wide association studies. However, on
 We also propose an automatic procedure to construct the model using factor analysis and the maximum likelihood method. For estimating a large number of parameters in the model, we performed Bayesian inference and implemented Gibbs sampling. An important feature of the model is that it correctly copes with non-normally distributed variables, such as some traits and variants.
 
 
+## Pipeline
+
+To construct the model and add SNPs then, use the following scripts:
+`pipeline_spart.py` and `pipeline_add_snps.py`.
+To optimise parameters and get predictions, follow the next notebooks:
+`mcmc_estimate.ipynb` and `mcmc_predict.ipynb`
+
+
 ## References
 
 A.A.Igolkina et al., *Multi-trait multi-locus SEM model discriminates SNPs of different effects*
