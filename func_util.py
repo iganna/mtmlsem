@@ -9,6 +9,8 @@ __email__ = "igolkinaanna11@gmail.com"
 
 import os
 import re
+import string
+import numpy as np
 
 def create_path(path_tmp):
     """
@@ -134,3 +136,26 @@ def filter_by_pref(list, pref):
 
     return [s for s in list if s.startswith(pref)]
 
+
+def is_symmetric(a: np.array):
+    """
+    Check whether the matrix is symmetric
+    :param a:
+    :return:
+    """
+    tol = 1e-10
+    return (np.abs(a - a.T) <= tol).all()
+
+
+def check_names(names):
+    """
+    Check that all elements in a list start with a letter
+    :param names:
+    :return:
+    """
+
+    ALPHA = string.ascii_letters
+    ALPHA += '_'
+    for s in names:
+        if not s.startswith(tuple(ALPHA)):
+            raise ValueError(f'Variable name {s} is not supported')

@@ -1,0 +1,1 @@
+ordinal:	FloCol	StemCol	FlowStemCol	SeedCol	PodShape	SeedShape	BushShape	StemBr	StemBr1ord	StemBr2ord	StemL1ord	LeafSize	PodD	PodS	AscoRes	Germ

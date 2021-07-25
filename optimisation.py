@@ -12,21 +12,40 @@ from dataset import *
 class OptBayes:
 
     t_lat, t_obs, t_ord = ['latent', 'observed', 'ordinal']
-    def __init__(self, relations, data: Data, var_ord=None):
+    def __init__(self, relations,
+                 data: Data,
+                 random_effects=None,
+                 var_ord=None):
         """
 
-        :param sem:
+        :param relations:
         :param data:
+        :param random_effects:
         :param var_ord:
         """
         # Get relationships between variables
         # relations = sem.inspect()
-        v_endo = relations['lval'][relations['op'] == '~']
-        v_exo = relations['rval'][relations['op'] == '~']
-        estims = relations['Estimate'][relations['op'] == '~']
-        v_endo_uniq = v_endo.unique().tolist()
+        v_endo_all = relations['lval'][relations['op'] == '~']
+        v_exo_all = relations['rval'][relations['op'] == '~']
 
-        # Split variables
+        # Stlit exogenous variables to really observed and random effects
+        # observed
+        if random_effects is None:
+            random_effects = []
+
+        i_exo = [i for i, v in enumerate(v_exo_all) if v not in random_effects]
+        v_exo = v_exo_all[i_exo]
+        v_endo = v_endo_all[i_exo]
+        v_endo_uniq = v_endo.unique().tolist()
+        estims = relations['Estimate'][relations['op'] == '~'][i_exo]
+
+        # random effects
+        i_reff = [i for i, v in enumerate(v_exo_all) if v in random_effects]
+        v_exo_reff = v_exo_all[i_reff]
+        v_endo_reff = v_endo_all[i_reff]
+
+
+        # Fins types of variables: latent/observed
         vars = list(set(v_exo) | set(v_endo))
 
         self.v = dict()
@@ -48,8 +67,6 @@ class OptBayes:
             self.v[self.t_ord] = var_ord
 
 
-
-
         self.endo = []
         self.exo = []
         self.params = []
@@ -64,15 +81,51 @@ class OptBayes:
             # self.params += [[0] * len(self.exo[-1])]
             self.params += [np.random.rand(len(self.exo[-1]))]
             self.priors += [np.array(priors_tmp)]
-            self.reff += [[]]
 
-        self.mcmc = []
-        # # add fake equations for exogenous latent variables - it needs covariance
-        # for i_lat in range(len(self.v[self.t_lat])):
-        #     if i_lat in []:
-        #         continue
+            # construct random effects for each endogenous variable
+            v_reff_tmp = v_exo_reff[v_endo_reff == v].tolist()
+            if len(v_reff_tmp) == 0:
+                self.reff += [dict()]
+                continue
+
+            r_params = []
+            r_types = []
+            r_z = np.empty((0, self.n))
+            r_t = np.empty((0, 0))
+            r_cov = np.empty((0, 0))
+            r_err = []
+
+            for rv in v_reff_tmp:
+                r_types += [(rv, value) for value in data.r_eff[rv].u_values]
+                r_params += [0] * data.r_eff[rv].n_values
+                r_err += [1]
+                r_z = np.concatenate((r_z, data.r_eff[rv].z), axis=0)
+
+                r_cov_add = data.r_eff[rv].cov_mx
+                tmp_mx = np.zeros((r_cov.shape[0], r_cov_add.shape[0]))
+                r_cov = np.block([[r_cov, tmp_mx],
+                                  [tmp_mx.transpose(), r_cov_add]])
+
+                r_t_tmp = np.ones((1, data.r_eff[rv].n_values))
+                tmp_mx1 = np.zeros((r_t.shape[0], data.r_eff[rv].n_values))
+                tmp_mx2 = np.zeros((1, r_t.shape[1]))
+
+                print(r_t.shape)
+                print(tmp_mx1.shape)
+                print(tmp_mx2.shape)
+                print(r_t_tmp.shape)
+
+                r_t = np.block([[r_t, tmp_mx1],
+                                [tmp_mx2, r_t_tmp]])
 
 
+            self.reff += [dict(params=r_params,
+                               types=r_types,
+                               z=r_z,
+                               z_inv=np.linalg.pinv(r_z),
+                               cov=r_cov,
+                               err=r_err,
+                               t=r_t)]
 
         self.n_eq = len(self.endo)  # number of equations
 
@@ -84,9 +137,10 @@ class OptBayes:
         # self.phi = []
         # for ieq in range(self.n_eq):
 
-
         # get help rapameters for Structural and Measurement parts
         self.create_sem_parts()
+
+        self.mcmc = []
 
 
     def find_type_and_id(self, v):
@@ -97,11 +151,17 @@ class OptBayes:
         raise ValueError('Undefined variable or type')
 
 
+    def calc_reff(self, ieq):
+        return self.reff[ieq]['params'] @ self.reff[ieq]['z']
+
+
     def optimize(self, n_mcmc = 1000):
 
+        # print(f'n lat {self.n_lat}')
         for _ in range(n_mcmc):
 
-            self.update_latent()
+            if self.n_lat > 0:
+                self.update_latent()
 
             # for ismpl in range(self.n):
             #     self.update_ordinal(ismpl)
@@ -176,8 +236,14 @@ class OptBayes:
                 else:
                     mx_pg[ilat, :] += self.params[ieq][iparam] * self.data[t][:, i]
 
+            # ADD RANDOM EFFECT to mx_pg
+            if len(self.reff[ieq]) > 0:
+                mx_pg[ilat, :] += self.calc_reff(ieq)
+
         # get C matrix
         mx_c = np.linalg.inv(np.identity(self.n_lat) - mx_beta)
+
+
 
         # ======================================================
         # Measurement part
@@ -194,7 +260,7 @@ class OptBayes:
 
             endo = self.endo[ieq]
             mx_pky[imp, :] = self.data[endo[0]][:, endo[1]]
-            # REMOVE RANDOM EFFECT
+
             for iparam, exo in enumerate(self.exo[ieq]):
                 t, i = exo
                 if t is self.t_lat:
@@ -203,8 +269,12 @@ class OptBayes:
                     # MINUS: it is correct!
                     mx_pky[imp, :] -= self.params[ieq][iparam] * self.data[t][:, i]
 
-        mx_lambda_inv = np.linalg.pinv(mx_lambda)
+            # REMOVE RANDOM EFFECT from mx_pky
+            if len(self.reff[ieq]) > 0:
+                mx_pky[imp, :] -= self.calc_reff(ieq)
 
+        # Inverse matrix for Lambda
+        mx_lambda_inv = np.linalg.pinv(mx_lambda)
 
         # from structural part
         mu1 = mx_c @ mx_pg
@@ -248,6 +318,9 @@ class OptBayes:
         x = np.array([self.data[t][:, i] for t, i in exo])
         # Values for the dependent variable
         z = self.data[endo[0]][:, endo[1]]
+        # REMOVE RANDOM EFFECT
+        if len(self.reff[ieq]) > 0:
+            z -= self.calc_reff(ieq)
 
         xx = x @ x.transpose()
         zx = z @ x.transpose()
@@ -274,13 +347,13 @@ class OptBayes:
                                                           cov=phi*self.e[ieq])
 
 
-    def update_reff(self, ieff):
+    def update_reff(self, ieq):
         """
-
-        :param ieff:
+        Upda random effects for each equation separately
+        :param ieq:
         :return:
         """
-        pass
+
 
     def inspect(self):
         relations = DataFrame(columns=['lval', 'rval', 'Estimate'])

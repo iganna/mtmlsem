@@ -1,0 +1,3 @@
+	FC1 =~ PodsWeight + PodsNumber + SeedsNumber + SeedsWeight
+	FC2 =~ FloCol + StemCol + FlowStemCol + SeedCol
+	FC2 ~ FC1

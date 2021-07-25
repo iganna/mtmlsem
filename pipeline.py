@@ -77,3 +77,7 @@ data, k = example_rf.get_data()
 model = ModelEffects(desc)
 model.fit(data, group='group', k=k)
 print(model.inspect())
+
+
+
+st.multivariate_normal.rvs(mean=[1,1], cov=[[1,1],[1,1]])

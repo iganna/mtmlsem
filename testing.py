@@ -31,6 +31,23 @@ data_gen.index = [f's{i}' for i in range(n)]
 # eta1 =~ y1 + y2 + y3
 # """
 
+model_desc = """
+x1 ~ g1 + g2
+"""
+
+
+# generate random effects
+group1 = pd.DataFrame(data={'group1': np.random.binomial(1, 0.5, size=n)})
+group1.index = [f's{i}' for i in range(n)]
+
+model_desc = """
+x1 ~ g1 + g2 + group1
+"""
+data_gen['x1'] = data_gen['x1'] + 10 * group1['group1']
+
+
+data_gen = concat([data_gen, group1], axis=1)
+
 snp = np.random.binomial(2, 0.5, size=n)
 snps = pd.DataFrame(data={'snp': snp})
 snps.index = [f's{i}' for i in range(n)]

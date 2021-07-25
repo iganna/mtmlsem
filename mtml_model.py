@@ -9,7 +9,6 @@ from dataset import *
 from lat_struct import *
 from optimisation import *
 
-
 from func_util import *
 
 class mtmlModel:
@@ -19,40 +18,80 @@ class mtmlModel:
                         'spruce': get_structure_picea,
                         'prior': get_structure_prior}
 
-
     def __init__(self,
-                 data: Data = None,
+                 data: Data=None,
+                 model_desc=None,
+                 phens_under_kinship=None,
+                 random_effects=None,
                  n_cv=None,
-                 model_sem: semopyModel = None,
-                 model_file=None,
-                 model_desc=None,  # TODO
                  snp_multi_sort=True,
-                 kinship_flag=True,
                  lat_struct_type=list(dict_lat_struct.keys())[0],
                  opt_type='bayes'):
+        """
+        Constructor of class model
+        :param data: data for the model
+        :param n_cv: number of cross-validation folds
+        :param model_desc: string descriprtion of the model, should be provided if model_sem is not
+        :param snp_multi_sort: TODO
+        :param phens_under_kinship: set of phenotypes, which are under the kinship influence
+        :param random_effects: list of names of variables with random effects
+        :param lat_struct_type: type of the latent structure consctuction
+        :param opt_type: type of optimisation
+        :param reff: list of names of random effect variables
+        """
+
 
         self.dict_opt = {'ml_reg': self.opt_ml,
                     'bayes': self.opt_bayes}
-
+        # --------------------------------------------------
         # Dataset and cross-validation dataset
         self.data = data
+        if random_effects is not None:
+            if not all([v in self.data.d_all.columns for v in random_effects]):
+                raise ValueError('Wrong names of random effects: '
+                                 'variables do not exist in the dataset')
 
+            # Add random effects if they were not added to the dataset before
+            for v in random_effects:
+                if v not in self.data.r_eff.keys():
+                    self.data.r_eff.update({v: REff(self.data.d_all[v])})
+
+        self.random_effects = random_effects
+
+        # --------------------------------------------------
         # Mod descriptions in a dictionary
-        self.mods = self.set_mod_description(model_sem=model_sem,
-                                             model_file=model_file,
-                                             model_desc=model_desc)
+        self.mods = self.set_mod_description(model_desc=model_desc)
+        # Add kinship do the model description
+        if phens_under_kinship is not None:
+            # Add kinship if is was not added to the dataset before
+            if Data.kinship_var_name not in self.data.r_eff.keys():
+                self.data.r_eff.update({Data.kinship_var_name:
+                                        self.data.estim_kinship()})
+
+            # TODO add kinship for all endogenous variables
+            if phens_under_kinship == 'all_endo':
+                phens_under_kinship = self.data.d_phens.colimns.tolist()
+
+            for k, mod in self.mods.items():
+                sem = Model(mod)
+                for v in sem.vars['all']:
+                    if v not in phens_under_kinship:
+                        continue
+                    mod = f'{mod}\n{v} ~ {Data.kinship_var_name}'
+                self.mods[k] = mod
+
+            self.random_effects += ['kinship']
+
+
+
+        # --------------------------------------------------
         # Cross-validation datasets
         if n_cv is None:
             self.cv_data = None
         else:
             self.cv_data = CVset(dataset=self.data, n_cv=n_cv)
 
-
-        # Kinship
-        self.kinship_flag = kinship_flag
-        if (self.kinship_flag) and (data.d_kinship is None) and (data is not None):
-            data.estim_kinship()
-
+        # --------------------------------------------------
         # parameters to construct latent structure
         self.lat_struct_type = self.set_lat_struct(lat_struct_type)
 
@@ -94,17 +133,20 @@ class mtmlModel:
             relations_prior = relations_prior.loc[relations_prior['op'] == '~',:]
             self.relations_prior = pd.concat([self.relations_prior,
                                               relations_prior], axis=0)
-            print(relations_prior.loc[:, ['lval', 'op', 'rval', 'Estimate']])
-            opt = OptBayes(relations=relations_prior, data=self.data)
+            # print(relations_prior.loc[:, ['lval', 'op', 'rval', 'Estimate']])
+            opt = OptBayes(relations=relations_prior, data=self.data,
+                           random_effects=self.random_effects)
             opt.optimize()
             relations_tmp = opt.inspect()
             relations_tmp['mod_name'] = k
             self.relations = pd.concat([self.relations, relations_tmp], axis=0)
             chains[k] = opt.mcmc
 
-        print(self.relations)
+        # print(self.relations)
         self.mcmc = chains
-        return {'params': self.relations, 'mcmc': chains}
+        # return {'params': self.relations, 'mcmc': chains}
+
+        return opt
 
 
     def opt_ml(self):
@@ -227,26 +269,60 @@ class mtmlModel:
         return self.opt_type
 
     def unnormalize(self):
+
+        # correct for first indicators of latent variables ?
+        first_ind = self.relations_prior.loc[self.relations_prior['Std. Err'] == '-', ['lval', 'rval']]
+        if len(first_ind['rval'].tolist()) != len(first_ind['rval'].unique().tolist()):
+            raise ValueError('Something is wrong in the model.....')
+
+        vars_lat = first_ind['rval'].tolist()
+        vars_obs = first_ind['lval'].tolist()
+
+        lat_correction = dict()
+        for v_obs, v_lat in zip(vars_obs, vars_lat):
+            idx_tmp = (self.relations['lval'] == v_obs) & \
+                      (self.relations['rval'] == v_lat)
+            lat_correction[v_lat] = (self.relations.loc[idx_tmp, 'Estimate'].item() *
+                                         self.data.s_phens[v_obs])
+
+
+
+
+
         self.params = self.relations.copy()
         for index in self.params.index:
             lval = self.params.loc[index, 'lval']
             rval = self.params.loc[index, 'rval']
             if lval in self.data.s_phens.index:
                 lstd = self.data.s_phens[lval]
+            elif lval in lat_correction.keys():
+                lstd = lat_correction[lval]
             else:
                 lstd = 1
 
             if rval in self.data.s_phens.index:
                 rstd = self.data.s_phens[rval]
+            elif rval in lat_correction.keys():
+                rstd = lat_correction[rval]
             else:
                 rstd = 1
 
 
             self.params.loc[index, 'Estimate'] *= (lstd / rstd)
 
+
+
+
+
         return self.params
 
 
+    def show_mod(self):
+        print('----- show models -----')
+        for k, mod in self.mods.items():
+            print(f'# Model {k}')
+            show(mod)
+            print('-----')
 
 
 
