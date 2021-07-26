@@ -19,7 +19,7 @@ class mtmlModel:
                         'prior': get_structure_prior}
 
     def __init__(self,
-                 data: Data=None,
+                 data: Data,
                  model_desc=None,
                  phens_under_kinship=None,
                  random_effects=None,
@@ -63,6 +63,7 @@ class mtmlModel:
         self.mods = self.set_mod_description(model_desc=model_desc)
         # Add kinship do the model description
         if phens_under_kinship is not None:
+
             # Add kinship if is was not added to the dataset before
             if Data.kinship_var_name not in self.data.r_eff.keys():
                 self.data.r_eff.update({Data.kinship_var_name:
@@ -71,17 +72,14 @@ class mtmlModel:
             # TODO add kinship for all endogenous variables
             if phens_under_kinship == 'all_endo':
                 phens_under_kinship = self.data.d_phens.colimns.tolist()
+            self.phens_under_kinship = phens_under_kinship
 
-            for k, mod in self.mods.items():
-                sem = Model(mod)
-                for v in sem.vars['all']:
-                    if v not in phens_under_kinship:
-                        continue
-                    mod = f'{mod}\n{v} ~ {Data.kinship_var_name}'
-                self.mods[k] = mod
+            # Add kinship to all models
+            self.add_kinship_to_mods()
 
             self.random_effects += ['kinship']
-
+        else:
+            self.phens_under_kinship = []
 
 
         # --------------------------------------------------
@@ -105,6 +103,14 @@ class mtmlModel:
         self.relations = self.empty_relations()
         self.params = self.empty_relations()
 
+    def add_kinship_to_mods(self):
+        for k, mod in self.mods.items():
+            sem = Model(mod)
+            for v in sem.vars['all']:
+                if v not in self.phens_under_kinship:
+                    continue
+                mod = f'{mod}\n{v} ~ {Data.kinship_var_name}'
+            self.mods[k] = mod
 
     def empty_relations(self):
         return DataFrame(columns=['lval', 'rval', 'Estimate', 'mod_name'])
@@ -114,12 +120,13 @@ class mtmlModel:
         self.get_lat_struct(cv=True)
         self.add_snps()
         opt = self.dict_opt[self.opt_type]
-        res = opt()
+        # res = opt()
 
 
-    def add_snps(self):
+    def add_snps(self, snp_pref=None):
         for k, mod in self.mods.items():
-            self.mods[k] = add_snps(mod, self.data, self.snp_multi_sort)
+            self.mods[k] = add_snps(mod, self.data,
+                                    self.snp_multi_sort, snp_pref=snp_pref)
 
 
     def opt_bayes(self, n_mcmc=1000):
@@ -208,7 +215,7 @@ class mtmlModel:
         :return:
         """
 
-        if (model_file is None) + (model_sem is None) + (model_desc is None) != 2:
+        if (model_file is None) + (model_sem is None) + (model_desc is None) == 1:
             raise ValueError('Only one way to set a model should be used')
 
         if (model_file is None) + (model_sem is None) + (model_desc is None) == 3:
@@ -241,13 +248,15 @@ class mtmlModel:
         if lat_struct_type is not None:
             self.lat_struct_type = lat_struct_type
             if self.lat_struct_type not in list(self.dict_lat_struct.keys()):
-                raise ValueError(f'Way to construct the structure is not: {lat_struct_type}')
+                raise ValueError(f'Way to construct the structure is not:'
+                                 f' {lat_struct_type}')
             if (self.lat_struct_type is not None) and \
                     (lat_struct_type != self.lat_struct_type):
-                print(f'Way to construct the structure was changed: {lat_struct_type}')
+                print(f'Way to construct the structure was changed: '
+                      f'{lat_struct_type}')
             self.lat_struct_type = lat_struct_type
         else:
-            print(f'Empty type of latent structure was not set. The type remains as{self.lat_struct_type}')
+            print(f'Type of the latent structure is {self.lat_struct_type}')
 
         return self.lat_struct_type
 
@@ -311,19 +320,15 @@ class mtmlModel:
 
             self.params.loc[index, 'Estimate'] *= (lstd / rstd)
 
-
-
-
-
         return self.params
 
 
     def show_mod(self):
-        print('----- show models -----')
+        print('======== show models ========')
         for k, mod in self.mods.items():
             print(f'# Model {k}')
             show(mod)
-            print('-----')
+        print('=============================')
 
 
 

@@ -3,7 +3,7 @@ Function to construct the latent structure
 """
 
 import warnings
-
+from semopy.efa import explore_cfa_model
 from semopy import ModelEffects, Model, ModelGeneralizedEffects
 from semopy.utils import calc_reduced_ml
 
@@ -117,9 +117,12 @@ def get_loading_cutoff(cv_data: CVset,
     jacc_loading = []
     for cutoff in loadings_cutoffs:
         jacc_pw = []
+        n_fac_pw = []
         for i, j in combinations(range(n_cv), 2):
             f1 = get_factors(cv_loads[i], cutoff)
             f2 = get_factors(cv_loads[j], cutoff)
+
+            n_fac_pw += [len(f1), len(f2)]
 
             if (len(f1) < len(f2)):  # If the number of factors in one
                 f1, f2 = (f2, f1)
@@ -134,12 +137,26 @@ def get_loading_cutoff(cv_data: CVset,
                     jacc_tmp_max = max(jacc_tmp_max, jacc_tmp)
                 jacc_pw += [jacc_tmp_max]
 
-        jacc_loading += [np.mean(jacc_pw)]
+        jacc_loading += [[np.mean(jacc_pw)] + [min(n_fac_pw), max(n_fac_pw)]]
         if echo:
             print(f'cutoff: {cutoff}; jaccard: {jacc_loading[-1]}')
 
-    idx_max_jaccard = [i for i, val in enumerate(jacc_loading)
-                       if val == max(jacc_loading)]
+    n_fa_max = max(v[2] for v in jacc_loading)
+    for n_fa in range(n_fa_max, 0, -1):
+        j_fix = [j for j, n1, n2 in jacc_loading if n1 == n2 == n_fa]
+        if len(j_fix) == 0:
+            continue
+        j_max = max(j_fix)
+        idx_max_jaccard = [i for i, jacc in enumerate(jacc_loading)
+                           if jacc[0] == j_max and jacc[1] == jacc[2] == n_fa]
+        break
+
+    # idx_max_jaccard = [i for i, val in enumerate(jacc_loading)
+    #                    if val == max(jacc_loading[:, 1])]
+
+    # print(jacc_loading)
+    print(jacc_loading[min(idx_max_jaccard)])
+    print(loadings_cutoffs[min(idx_max_jaccard)])
 
     return loadings_cutoffs[min(idx_max_jaccard)]
 
@@ -297,11 +314,14 @@ def get_structure_picea(data: Data,
     return mods
 
 
-def get_structure_picea_g():
+def get_structure_picea_g(data_phens):
     """
     Georgy
     :return:
     """
+
+    semopy_descr = explore_cfa_model(data_phens)
+    showl(semopy_descr)
     pass
 
 

@@ -6,6 +6,7 @@ import copy
 import warnings
 import numpy as np
 from pandas import read_csv, DataFrame, concat, Series
+from semopy.utils import calc_reduced_ml
 
 
 from math import ceil

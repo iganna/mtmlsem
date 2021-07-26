@@ -4,7 +4,6 @@ Functions to add SNPs
 
 
 import numpy as np
-
 from semopy import Model as semopyModel
 from semopy.utils import calc_reduced_ml
 from pandas import DataFrame, concat
@@ -17,16 +16,16 @@ from itertools import product
 
 def add_snps(mod,
              data: Data,
-             snp_multi_sorting=True):
+             snp_multi_sorting=True,
+             snp_pref=None):
     """
 
     :return: model and prior values of parameters
     """
 
-    thresh_mlr = 0.001
+    thresh_mlr = 0.01
     thresh_sign_snp = 0.05
     thresh_abs_param = 0.001
-    snp_pref = 'Ca'
 
     sem_mod = semopyModel(mod)
     vars_ordered = sem_traversing(mod)
@@ -39,6 +38,7 @@ def add_snps(mod,
     # sem_mod.fit(concat([data.d_phens, data.d_snps], axis=1))
     sem_mod.fit(data.d_all)
     mod_init = '\n'.join(parse_descr(sem_mod=sem_mod))
+    show(mod_init)
 
     sem_mod_init = semopyModel(mod_init)
     sem_mod_init.fit(data.d_all)
@@ -68,19 +68,17 @@ def add_snps_for_variable(mod,
                           thresh_mlr=0.001,
                           thresh_sign_snp=0.05,
                           thresh_abs_param=0.001,
-                          snp_pref=None,
-                          defenerate_flag=False):
+                          snp_pref=None):
     snp_skip = []
-    mod_init = mod
-    for _ in range(1):
+    mod_init = f'{mod}'
+    for _ in range(10):
         mod_new, snp_skip = \
             one_snp_for_variable(mod_init, data, variable,
                                  snp_skip=snp_skip,
                                  thresh_mlr=thresh_mlr,
                                  thresh_sign_snp=thresh_sign_snp,
                                  thresh_abs_param=thresh_abs_param,
-                                 snp_pref=snp_pref,
-                                 defenerate_flag=defenerate_flag)
+                                 snp_pref=snp_pref)
         if mod_new is None:
             print('NO SNPs added')
             break
@@ -96,8 +94,7 @@ def one_snp_for_variable(mod_init,
                          thresh_mlr,
                          thresh_sign_snp,
                          thresh_abs_param,
-                         snp_pref,
-                         defenerate_flag):
+                         snp_pref=None,):
     """
     This fucntion tests SNPs and add one SNP for a variable
     :param mod_init: model with some fixed parameters
@@ -114,37 +111,39 @@ def one_snp_for_variable(mod_init,
 
     # New models
     mod_tmp = f'{mod_init}\n{variable} ~ {v_tmp}'
-    sem_mod_init = semopyModel(mod_init)
-    sem_mod_tmp = semopyModel(mod_tmp)
+    mod_zero = f'{mod_init}\n{variable} ~ 0*{v_tmp}'
+    sem_mod_init = semopyModel(mod_init)  # without tmp dummy variable
+    sem_mod_tmp = semopyModel(mod_tmp)  # with tmp variable
+    sem_mod_zero = semopyModel(mod_zero)  # with tmp variable, but fixed influence to 0
 
     # New data
-    snp_all = filter_by_pref(data.snps, snp_pref)
+    snp_all = data.snps
+    if snp_pref is not None:
+        snp_all = filter_by_pref(snp_all, snp_pref)
     snp_in = intersect(snp_all, sem_mod_init.vars['all'])
     phens_in = intersect(data.phens, sem_mod_init.vars['all'])
 
     data_tmp = concat([data.d_phens[phens_in], data.d_snps[snp_in]], axis=1)
     data_tmp[v_tmp] = np.zeros(data.n_samples)
-
-    # Fit initial model
-    fit_init = sem_mod_init.fit(data_tmp)
-
     snp = data.snps[0]
     data_tmp[v_tmp] = data.d_snps[snp]
 
-    mod_zero = f'{mod_init}\n{variable} ~ 0*{v_tmp}'
-    sem_mod_zero = semopyModel(mod_zero)
-    fit_zero = sem_mod_zero.fit(data_tmp)
+    # Fit models
+    sem_mod_init.fit(data_tmp)
+    sem_mod_zero.fit(data_tmp)
 
-    print(calc_reduced_ml(sem_mod_zero, [v_tmp]), fit_init.fun)
+    fit_init_reduced = calc_reduced_ml(sem_mod_zero, data.phens)
+    fit_zero_reduced = calc_reduced_ml(sem_mod_zero, data.phens)
 
+    print(fit_zero_reduced, fit_init_reduced)
+    if abs(fit_zero_reduced - fit_init_reduced) > 0.01:
+        raise ValueError('Something is going wring')
 
     # Try all SNPs
 
-
-
-
     snp_list = []
     print(f'Skip {len(snp_skip)} SNPs')
+
     for snp in snp_all:
 
         if snp in snp_skip:
@@ -156,17 +155,10 @@ def one_snp_for_variable(mod_init,
             # TODO tune optimizer: what was it for?
 
             data_tmp[v_tmp] = data.d_snps[snp]
-            fit_tmp = sem_mod_tmp.fit(data_tmp, clean_slate=True)
-            fit_delta = fit_tmp.fun  # the higher the better
-
-            if defenerate_flag:
-                fit_delta = fit_init.fun - calc_reduced_ml(sem_mod_tmp, {v_tmp})
-                # print(fit_delta)
-                # If the increment of MLR is small - stop considering the SNP
-                if fit_delta < thresh_mlr:
-                    snp_skip += [snp]
-                    # print(fit_delta)
-                    continue
+            sem_mod_tmp.fit(data_tmp, clean_slate=True)
+            fit_tmp_reduced = calc_reduced_ml(sem_mod_tmp, data.phens)
+            fit_delta = fit_init_reduced - fit_tmp_reduced
+            # print(fit_delta)
 
             effect = [[row['Estimate'], row['p-value']] for _, row in sem_mod_tmp.inspect().iterrows()
                       if (row['lval'] == variable) and
@@ -175,6 +167,13 @@ def one_snp_for_variable(mod_init,
             if len(effect) > 1:
                 raise ValueError("S")
             param_val, pval = effect[0]
+
+            snp_list += [(snp, fit_delta, pval)]
+
+            # If the increment of MLR is small - stop considering the SNP
+            if -fit_delta < thresh_mlr:
+                snp_skip += [snp]
+                continue
 
             # If the influence is not significant - stop considering the SNP
             if pval > thresh_sign_snp:
@@ -213,10 +212,10 @@ def one_snp_for_variable(mod_init,
     fit_max = sem_mod_max.fit(data_tmp)
     print(fit_max.fun)
 
-    calc_reduced_ml(sem_mod_max, {snp_max})
+    fit_anp_reduced = calc_reduced_ml(sem_mod_max, data.phens)
 
 
-    showl([fit_init.fun, fit_init.fun + fit_delta, fit_max.fun])
+    showl([fit_init_reduced, fit_anp_reduced, fit_delta])
 
     return mod_max, snp_skip
 
@@ -268,7 +267,7 @@ def sem_var_order(descr):
         var_lat = var_lat_new
         var_exo = list(sem_mod.vars['exogenous'])
         var_lat_exo = intersect(var_lat, var_exo)
-    print(var_order)
+    # print(var_order)
 
     return var_order, var_phen
 
@@ -309,7 +308,7 @@ def parse_descr(descr=None, sem_mod=None):
     :param descr: String
     :return:
     """
-    print(descr, sem_mod)
+    # print(descr, sem_mod)
     if (descr is None) and (sem_mod is None):
         raise ValueError('Please provide arguments')
     if descr is None:
@@ -353,7 +352,7 @@ def parse_descr(descr=None, sem_mod=None):
             descr_parse += [f'{p[1]} =~ {v} * {p[0]}' for p, v in zip(pairs, vals)]
 
 
-    showl(descr_parse)
+    # showl(descr_parse)
 
     return descr_parse
 

@@ -16,7 +16,7 @@ from semopy import Model as semopyModel
 from lat_struct import *
 from optimisation import *
 from func_util import *
-from unit_tests import test0, test1, test2
+from unit_tests import test0, test1, test2, test3
 
 
 # model_desc, data, model = test0()
@@ -24,6 +24,7 @@ from unit_tests import test0, test1, test2
 # model_desc, data, model = test1()
 #
 # model_desc, data, model = test2()
+model_desc, data, model = test3()
 
 
 
@@ -33,15 +34,13 @@ np.random.seed(125)
 random.seed(239)
 n = 100
 
-model_desc = semopy.model_generation.generate_desc(n_lat=0, n_endo=1, n_exo=2, n_inds=3, n_cycles=0)
-# show(model_desc)
+model_desc = semopy.model_generation.generate_desc(n_lat=0, n_endo=2, n_exo=2, n_inds=3, n_cycles=0)
+show(model_desc)
 params, aux = semopy.model_generation.generate_parameters(model_desc)
 data_gen = semopy.model_generation.generate_data(aux, n)
 data_gen.index = [f's{i}' for i in range(n)]
 
-# generate random effects
-group1 = pd.DataFrame(data={'group1': np.random.binomial(2, 0.5, size=n)})
-group1.index = [f's{i}' for i in range(n)]
+
 
 model_desc = """
 x1 ~ g1 + g2 + group1
@@ -53,27 +52,42 @@ x1 ~ g1 + g2 + group1
 
 show(model_desc)
 
+
+# generate random effects
+group1 = pd.DataFrame(data={'group1': np.random.binomial(2, 0.5, size=n)})
+group1.index = [f's{i}' for i in range(n)]
 tmp = 0 + group1['group1']
 tmp[tmp == 1] = 3
 data_gen['x1'] = data_gen['x1'] + 2 * tmp
 data_gen = concat([data_gen, group1], axis=1)
+
+group2 = pd.DataFrame(data={'group2': np.random.binomial(2, 0.5, size=n)})
+group2.index = [f's{i}' for i in range(n)]
+tmp = 0 + group2['group2']
+tmp[tmp == 1] = 3
+data_gen['x1'] = data_gen['x1'] + 2 * tmp
+data_gen = concat([data_gen, group2], axis=1)
 
 
 data = Data(d_phens=data_gen,
             s_reffs=['group1'],
             show_warning=False)
 
+model_desc = """
+x2 ~ g1 + g2 + group1 + group2
+x1 ~ x2
+"""
 
 model = mtmlModel(model_desc=model_desc,
                   data=data,
-                  random_effects=['group1'])
+                  random_effects=['group1', 'group2'])
 
 np.random.seed(2346)
 opt = model.opt_bayes()
 
 print(model.unnormalize())
 
-x = np.concatenate((opt.data['_observed'],opt.data['group1']), axis=1)
+x = np.concatenate((opt.data['_observed'], opt.data['group1']), axis=1)
 np.corrcoef(x.transpose())
 opt.v
 
