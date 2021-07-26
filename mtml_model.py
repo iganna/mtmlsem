@@ -122,7 +122,7 @@ class mtmlModel:
             self.mods[k] = add_snps(mod, self.data, self.snp_multi_sort)
 
 
-    def opt_bayes(self):
+    def opt_bayes(self, n_mcmc=1000):
 
         self.relations = self.empty_relations()
         chains = dict()
@@ -136,7 +136,8 @@ class mtmlModel:
             # print(relations_prior.loc[:, ['lval', 'op', 'rval', 'Estimate']])
             opt = OptBayes(relations=relations_prior, data=self.data,
                            random_effects=self.random_effects)
-            opt.optimize()
+            # return  opt
+            opt.optimize(n_mcmc=n_mcmc)
             relations_tmp = opt.inspect()
             relations_tmp['mod_name'] = k
             self.relations = pd.concat([self.relations, relations_tmp], axis=0)

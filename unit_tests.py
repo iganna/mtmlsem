@@ -26,8 +26,6 @@ def test0():
     random.seed(239)
     n = 100
 
-    np.random.seed(125)
-    n = 100
 
     model_desc = semopy.model_generation.generate_desc(n_lat=0, n_endo=1, n_exo=2, n_inds=3, n_cycles=0)
     params, aux = semopy.model_generation.generate_parameters(model_desc)
@@ -75,11 +73,10 @@ def test0():
     insp = semba_model.inspect()
     insp = insp.loc[insp['op'] == '~', ['lval', 'rval', 'Estimate']]
     print(insp)
-
+    print('params')
+    print(params)
 
     return model_desc, data, model
-
-
 
 
 
@@ -127,6 +124,8 @@ def test1():
     insp = semba_model.inspect()
     insp = insp.loc[insp['op'] == '~', ['lval', 'rval', 'Estimate']]
     print(insp)
+    print('params')
+    print(params)
 
     return model_desc, data, model
 
@@ -192,6 +191,9 @@ def test2():
     insp = semba_model.inspect()
     insp = insp.loc[insp['op'] == '~', ['lval', 'rval', 'Estimate']]
     print(insp)
+
+    print('params')
+    print(params)
 
 
     return model_desc, data, model

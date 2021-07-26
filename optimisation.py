@@ -11,7 +11,7 @@ from dataset import *
 
 class OptBayes:
 
-    t_lat, t_obs, t_ord = ['latent', 'observed', 'ordinal']
+    t_lat, t_obs, t_ord, t_m = ['_latent', '_observed', '_ordinal', '_mean']
     def __init__(self, relations,
                  data: Data,
                  random_effects=None,
@@ -32,6 +32,7 @@ class OptBayes:
         # observed
         if random_effects is None:
             random_effects = []
+        self.random_effects = random_effects
 
         i_exo = [i for i, v in enumerate(v_exo_all) if v not in random_effects]
         v_exo = v_exo_all[i_exo]
@@ -54,78 +55,111 @@ class OptBayes:
         self.v[self.t_obs] = [v for v in vars
                               if v in data.d_all.columns]
 
+
         self.n = data.n_samples
 
         self.data = dict()
         self.data[self.t_lat] = np.random.rand(self.n, len(self.v[self.t_lat]))
         self.data[self.t_obs] = data.d_all.loc[:, self.v[self.t_obs]].to_numpy()
+        # add random effects to data
+        for v_reff in random_effects:
+            self.data[v_reff] = data.r_eff[v_reff].z.transpose()
+        self.data[self.t_m] = np.ones((self.n, 1))
 
-        if var_ord is not None:
-            self.v[self.t_ord] = list(var_ord)
-            self.data[self.t_ord] = np.random.rand(self.n, len(self.v[self.t_ord]))
-        else:
-            self.v[self.t_ord] = var_ord
+
+        # TODO
+        # if var_ord is not None:
+        #     self.v[self.t_ord] = list(var_ord)
+        #     self.data[self.t_ord] = np.random.rand(self.n, len(self.v[self.t_ord]))
+        # else:
+        #     self.v[self.t_ord] = var_ord
 
 
         self.endo = []
         self.exo = []
         self.params = []
-        self.reff = []  # random effect
         self.priors = []
+        self.p_cov = []
+        self.p_cov_inv = []
 
         for v in v_endo_uniq:
             self.endo += [self.find_type_and_id(v)]
             exo_tmp = v_exo[v_endo == v].tolist()
             priors_tmp = estims[v_endo == v].tolist()
             self.exo += [[self.find_type_and_id(u) for u in exo_tmp]]
-            # self.params += [[0] * len(self.exo[-1])]
             self.params += [np.random.rand(len(self.exo[-1]))]
             self.priors += [np.array(priors_tmp)]
 
+            # # add means
+            # if self.endo[-1][0] is not self.t_lat:
+            #     # add mean
+            #     self.exo[-1] += [(self.t_m, 0)]
+            #     self.params[-1] = np.concatenate((self.params[-1], [0]))
+            #     self.priors[-1] = np.concatenate((self.priors[-1], [0]))
+
+
+            self.p_cov += [np.identity(len(self.params[-1]))]
+
+
             # construct random effects for each endogenous variable
-            v_reff_tmp = v_exo_reff[v_endo_reff == v].tolist()
-            if len(v_reff_tmp) == 0:
-                self.reff += [dict()]
+            r_eq = v_exo_reff[v_endo_reff == v].tolist()
+            if len(r_eq) == 0:
+                self.p_cov_inv += [np.linalg.inv(self.p_cov[-1])]
                 continue
 
-            r_params = []
-            r_types = []
-            r_z = np.empty((0, self.n))
-            r_t = np.empty((0, 0))
-            r_cov = np.empty((0, 0))
-            r_err = []
+            for r in r_eq:
+                r_exo = [(r, i) for i in range(self.data[r].shape[1])]
+                self.exo[-1] += r_exo
 
-            for rv in v_reff_tmp:
-                r_types += [(rv, value) for value in data.r_eff[rv].u_values]
-                r_params += [0] * data.r_eff[rv].n_values
-                r_err += [1]
-                r_z = np.concatenate((r_z, data.r_eff[rv].z), axis=0)
+                r_cov = data.r_eff[r].cov_mx
+                tmp_mx = np.zeros((self.p_cov[-1].shape[0], r_cov.shape[0]))
+                self.p_cov[-1] = np.block([[self.p_cov[-1], tmp_mx],
+                                           [tmp_mx.transpose(), r_cov]])
 
-                r_cov_add = data.r_eff[rv].cov_mx
-                tmp_mx = np.zeros((r_cov.shape[0], r_cov_add.shape[0]))
-                r_cov = np.block([[r_cov, tmp_mx],
-                                  [tmp_mx.transpose(), r_cov_add]])
+                self.params[-1] = np.concatenate((self.params[-1],
+                                                  [0] * len(r_exo)))
+                self.priors[-1] = np.concatenate((self.priors[-1],
+                                                  [0] * len(r_exo)))
+                # self.priors[-1] = np.concatenate((self.priors[-1],
+                #                                   [0, 2, 200]))
 
-                r_t_tmp = np.ones((1, data.r_eff[rv].n_values))
-                tmp_mx1 = np.zeros((r_t.shape[0], data.r_eff[rv].n_values))
-                tmp_mx2 = np.zeros((1, r_t.shape[1]))
-
-                print(r_t.shape)
-                print(tmp_mx1.shape)
-                print(tmp_mx2.shape)
-                print(r_t_tmp.shape)
-
-                r_t = np.block([[r_t, tmp_mx1],
-                                [tmp_mx2, r_t_tmp]])
+            self.p_cov_inv += [np.linalg.inv(self.p_cov[-1])]
 
 
-            self.reff += [dict(params=r_params,
-                               types=r_types,
-                               z=r_z,
-                               z_inv=np.linalg.pinv(r_z),
-                               cov=r_cov,
-                               err=r_err,
-                               t=r_t)]
+            # r_params = []
+            # r_types = []
+            # r_z = np.empty((0, self.n))
+            # r_t = np.empty((0, 0))
+            # r_cov = np.empty((0, 0))
+            # r_err = []
+            #
+            # for rv in v_reff_tmp:
+            #     r_types += [(rv, value) for value in data.r_eff[rv].u_values]
+            #     r_params += [0] * data.r_eff[rv].n_values
+            #     r_err += [1]
+            #     r_z = np.concatenate((r_z, data.r_eff[rv].z), axis=0)
+            #
+            #     r_cov_add = data.r_eff[rv].cov_mx
+            #     tmp_mx = np.zeros((r_cov.shape[0], r_cov_add.shape[0]))
+            #     r_cov = np.block([[r_cov, tmp_mx],
+            #                       [tmp_mx.transpose(), r_cov_add]])
+            #
+            #     r_t_tmp = np.ones((1, data.r_eff[rv].n_values))
+            #     tmp_mx1 = np.zeros((r_t.shape[0], data.r_eff[rv].n_values))
+            #     tmp_mx2 = np.zeros((1, r_t.shape[1]))
+            #
+            #     r_t = np.block([[r_t, tmp_mx1],
+            #                     [tmp_mx2, r_t_tmp]])
+            #
+            # self.reff += [dict(params=r_params,
+            #                    types=r_types,
+            #                    z=r_z,
+            #                    z_inv=np.linalg.pinv(r_z),
+            #                    cov=r_cov,
+            #                    err=r_err,
+            #                    t=r_t,
+            #                    cov_inv=np.linalg.inv(r_cov),
+            #                    z_cov=r_z @ r_z.transpose())]
 
         self.n_eq = len(self.endo)  # number of equations
 
@@ -160,6 +194,7 @@ class OptBayes:
         # print(f'n lat {self.n_lat}')
         for _ in range(n_mcmc):
 
+
             if self.n_lat > 0:
                 self.update_latent()
 
@@ -168,6 +203,12 @@ class OptBayes:
 
             for ieq in range(self.n_eq):
                 self.update_params(ieq)
+
+                # if len(self.reff[ieq]) > 0:
+                #     self.update_reff(ieq)
+
+            # print(self.e)
+
 
             self.mcmc += [[item for sublist in self.params for item in sublist]]
             # self.update_reff()
@@ -236,9 +277,9 @@ class OptBayes:
                 else:
                     mx_pg[ilat, :] += self.params[ieq][iparam] * self.data[t][:, i]
 
-            # ADD RANDOM EFFECT to mx_pg
-            if len(self.reff[ieq]) > 0:
-                mx_pg[ilat, :] += self.calc_reff(ieq)
+            # # ADD RANDOM EFFECT to mx_pg
+            # if len(self.reff[ieq]) > 0:
+            #     mx_pg[ilat, :] += self.calc_reff(ieq)
 
         # get C matrix
         mx_c = np.linalg.inv(np.identity(self.n_lat) - mx_beta)
@@ -269,9 +310,9 @@ class OptBayes:
                     # MINUS: it is correct!
                     mx_pky[imp, :] -= self.params[ieq][iparam] * self.data[t][:, i]
 
-            # REMOVE RANDOM EFFECT from mx_pky
-            if len(self.reff[ieq]) > 0:
-                mx_pky[imp, :] -= self.calc_reff(ieq)
+            # # REMOVE RANDOM EFFECT from mx_pky
+            # if len(self.reff[ieq]) > 0:
+            #     mx_pky[imp, :] -= self.calc_reff(ieq)
 
         # Inverse matrix for Lambda
         mx_lambda_inv = np.linalg.pinv(mx_lambda)
@@ -310,33 +351,32 @@ class OptBayes:
         a0, b0 = self.e_ab_prior[ieq]
         endo = self.endo[ieq]
         exo = self.exo[ieq]
-        params = self.params[ieq]
-        reff = self.reff[ieq]  # random effect
         priors = self.priors[ieq]
+        p_cov_inv = self.p_cov_inv[ieq]
 
         # Values for influencing variables
         x = np.array([self.data[t][:, i] for t, i in exo])
         # Values for the dependent variable
-        z = self.data[endo[0]][:, endo[1]]
-        # REMOVE RANDOM EFFECT
-        if len(self.reff[ieq]) > 0:
-            z -= self.calc_reff(ieq)
+        z = 0 + self.data[endo[0]][:, endo[1]]
+        # # REMOVE RANDOM EFFECT
+        # if len(self.reff[ieq]) > 0:
+        #     z -= self.calc_reff(ieq)
 
         xx = x @ x.transpose()
         zx = z @ x.transpose()
 
-        phi_inv = xx + np.identity(len(x))
+        phi_inv = xx + p_cov_inv #+ np.identity(len(x))
         phi = np.linalg.inv(phi_inv)
 
-        post = phi.dot(zx + priors)  # porsterior mean
+        post = phi.dot(zx + p_cov_inv @ priors)  # porsterior mean
 
         a = a0 + self.n/2
         b = b0 + 1/2 * (- post @ phi_inv @ post +
                         z @ z +
-                        priors @ priors)
+                        priors @ p_cov_inv @ priors)
 
         # update error terms
-        # b parameter the scale parameter, carefully checked !!!
+        # b parameter is the scale parameter, carefully checked !!!
         self.e[ieq] = st.invgamma.rvs(a=a, scale=b)
         # update params
         if(len(post) == 1):
@@ -347,16 +387,39 @@ class OptBayes:
                                                           cov=phi*self.e[ieq])
 
 
-    def update_reff(self, ieq):
-        """
-        Upda random effects for each equation separately
-        :param ieq:
-        :return:
-        """
-
+    # def update_reff(self, ieq):
+    #     """
+    #     Upda random effects for each equation separately
+    #     :param ieq:
+    #     :return:
+    #     """
+    #
+    #     # get observed part
+    #     endo = self.endo[ieq]
+    #     y = 0 + self.data[endo[0]][:, endo[1]]
+    #     for iparam, exo in enumerate(self.exo[ieq]):
+    #         t, i = exo
+    #         # MINUS: it is correct!
+    #         y -= self.params[ieq][iparam] * self.data[t][:, i]
+    #
+    #
+    #     mu1 = y @ self.reff[ieq]['z_inv']
+    #     sigma1_inv = self.reff[ieq]['z_cov'] # /
+    #
+    #     mu2 = mu1 * 0
+    #     # TODO
+    #     sigma2_inv = self.reff[ieq]['cov_inv']
+    #
+    #     sigma = np.linalg.inv(sigma1_inv + sigma2_inv)
+    #     mu = sigma @ (sigma1_inv @ mu1 + sigma2_inv @ mu2)
+    #
+    #     self.reff[ieq]['params'] = \
+    #         st.multivariate_normal.rvs(mean=mu, cov=sigma * self.e[ieq])
+    #
+    #     print(self.reff[ieq]['params'])
 
     def inspect(self):
-        relations = DataFrame(columns=['lval', 'rval', 'Estimate'])
+        relations = DataFrame(columns=['lval', 'rval', 'Estimate', 'op'])
 
         id = 0
         for ieq in range(self.n_eq):
@@ -365,9 +428,20 @@ class OptBayes:
 
             for ipar in range(len(self.params[ieq])):
                 exo = self.exo[ieq][ipar]
-                relations.loc[id] = [self.v[endo[0]][endo[1]],
-                                     self.v[exo[0]][exo[1]],
-                                     self.params[ieq][ipar]]
+                if exo[0] in self.random_effects:
+                    relations.loc[id] = [self.v[endo[0]][endo[1]],
+                                         f'{exo[0]}:{exo[1]}',
+                                         self.params[ieq][ipar], 'reff']
+                elif exo[0] is self.t_m:
+                    relations.loc[id] = [self.v[endo[0]][endo[1]],
+                                         'mean',
+                                         self.params[ieq][ipar], '~']
+
+                else:
+                    relations.loc[id] = [self.v[endo[0]][endo[1]],
+                                         self.v[exo[0]][exo[1]],
+                                         self.params[ieq][ipar], '~']
+
                 id += 1
 
         return relations
