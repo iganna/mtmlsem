@@ -5,11 +5,12 @@ Functions to add SNPs
 
 import numpy as np
 from semopy import Model as semopyModel
+# from semopy import ModelMeans as semopyModel
 from semopy.utils import calc_reduced_ml
 from pandas import DataFrame, concat
 from dataset import Data
 
-from func_util import *
+from utils import *
 
 from itertools import product
 
@@ -40,7 +41,7 @@ def add_snps(mod,
     mod_init = '\n'.join(parse_descr(sem_mod=sem_mod))
     show(mod_init)
 
-    sem_mod_init = semopyModel(mod_init)
+    sem_mod_init = semopyModel(mod_init, cov_diag=True)
     sem_mod_init.fit(data.d_all)
 
     for variable in vars_lat_ord:
@@ -112,9 +113,12 @@ def one_snp_for_variable(mod_init,
     # New models
     mod_tmp = f'{mod_init}\n{variable} ~ {v_tmp}'
     mod_zero = f'{mod_init}\n{variable} ~ 0*{v_tmp}'
-    sem_mod_init = semopyModel(mod_init)  # without tmp dummy variable
-    sem_mod_tmp = semopyModel(mod_tmp)  # with tmp variable
-    sem_mod_zero = semopyModel(mod_zero)  # with tmp variable, but fixed influence to 0
+    sem_mod_init = semopyModel(mod_init, cov_diag=True)  # without tmp dummy variable
+    sem_mod_tmp = semopyModel(mod_tmp, cov_diag=True)  # with tmp variable
+    sem_mod_zero = semopyModel(mod_zero, cov_diag=True)  # with tmp variable, but fixed influence to 0
+
+    for tmp in [sem_mod_init, sem_mod_tmp, sem_mod_zero]:
+        fix_variances(tmp)
 
     # New data
     snp_all = data.snps
@@ -131,9 +135,12 @@ def one_snp_for_variable(mod_init,
     # Fit models
     sem_mod_init.fit(data_tmp)
     sem_mod_zero.fit(data_tmp)
+    sem_mod_tmp.fit(data_tmp)
 
-    fit_init_reduced = calc_reduced_ml(sem_mod_zero, data.phens)
+
+    fit_init_reduced = calc_reduced_ml(sem_mod_init, data.phens)
     fit_zero_reduced = calc_reduced_ml(sem_mod_zero, data.phens)
+    fit_tmp_reduced = calc_reduced_ml(sem_mod_tmp, data.phens)
 
     print(fit_zero_reduced, fit_init_reduced)
     if abs(fit_zero_reduced - fit_init_reduced) > 0.01:
@@ -168,10 +175,10 @@ def one_snp_for_variable(mod_init,
                 raise ValueError("S")
             param_val, pval = effect[0]
 
-            snp_list += [(snp, fit_delta, pval)]
+            # snp_list += [(snp, fit_delta, pval)]
 
             # If the increment of MLR is small - stop considering the SNP
-            if -fit_delta < thresh_mlr:
+            if fit_delta < thresh_mlr:
                 snp_skip += [snp]
                 continue
 
@@ -357,3 +364,9 @@ def parse_descr(descr=None, sem_mod=None):
     return descr_parse
 
 
+def fix_variances(sem: semopyModel, var_cutoff=0.05):
+    for k, v in sem.parameters.items():
+        if not k.startswith('_c'):
+            continue
+        v.bound = (0, var_cutoff)
+    return sem

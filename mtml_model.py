@@ -8,12 +8,13 @@ from add_snps import *
 from dataset import *
 from lat_struct import *
 from optimisation import *
+from offspring import *
 
-from func_util import *
+from utils import *
 
 class mtmlModel:
 
-    dict_lat_struct = {'unconnect': get_structure_unconnect,
+    dict_lat_struct = {'unconnected': get_structure_unconnect,
                         'connected': get_structure_connected,
                         'spruce': get_structure_picea,
                         'prior': get_structure_prior}
@@ -103,7 +104,12 @@ class mtmlModel:
         self.relations = self.empty_relations()
         self.params = self.empty_relations()
 
+
     def add_kinship_to_mods(self):
+        """
+        Add additional random variable as kinship to each phenotype to each model
+        :return:
+        """
         for k, mod in self.mods.items():
             sem = Model(mod)
             for v in sem.vars['all']:
@@ -112,10 +118,20 @@ class mtmlModel:
                 mod = f'{mod}\n{v} ~ {Data.kinship_var_name}'
             self.mods[k] = mod
 
+
     def empty_relations(self):
+        """
+        Create an empty dataframe with repationships between parameters
+        :return:
+        """
         return DataFrame(columns=['lval', 'rval', 'Estimate', 'mod_name'])
 
+
     def run_pipeline(self):
+        """
+        Pipeline
+        :return:
+        """
 
         self.get_lat_struct(cv=True)
         self.add_snps()
@@ -124,12 +140,51 @@ class mtmlModel:
 
 
     def add_snps(self, snp_pref=None):
+        """
+        Add SNPs to each model
+        :param snp_pref:
+        :return:
+        """
         for k, mod in self.mods.items():
             self.mods[k] = add_snps(mod, self.data,
                                     self.snp_multi_sort, snp_pref=snp_pref)
 
 
+    def usefulness(self):
+        """
+        Calculate usefullness
+        :return:
+        """
+        # TODO: Anna
+        usefulness()
+        pass
+
+
+    def distr_phen_offspring(self):
+        """
+        Calculate distribution of phenotypes.....
+        :return:
+        """
+        # TODO: Anna
+        phen_ofspring()
+        pass
+
+
+    def predict(self):
+        """
+        Predict phenotypes by SNPs
+        :return:
+        """
+        # TODO: Anna
+        pass
+
+
     def opt_bayes(self, n_mcmc=1000):
+        """
+        Optimize with bayes
+        :param n_mcmc:
+        :return:
+        """
 
         self.relations = self.empty_relations()
         chains = dict()
@@ -167,7 +222,7 @@ class mtmlModel:
             sem = semopyModel(mod)
             sem.fit(self.data.d_all)
 
-            # TODO
+            # TODO: to be continued
             self.relations = sem.inspect()
 
 
@@ -278,7 +333,13 @@ class mtmlModel:
 
         return self.opt_type
 
-    def unnormalize(self):
+
+    def unnormalize_params(self):
+        """
+        In the dataset, some phenotypes are standardized,
+        so we need fo rescale optimized parameters to match initial values of phenotypes
+        :return:
+        """
 
         # correct for first indicators of latent variables ?
         first_ind = self.relations_prior.loc[self.relations_prior['Std. Err'] == '-', ['lval', 'rval']]
@@ -294,9 +355,6 @@ class mtmlModel:
                       (self.relations['rval'] == v_lat)
             lat_correction[v_lat] = (self.relations.loc[idx_tmp, 'Estimate'].item() *
                                          self.data.s_phens[v_obs])
-
-
-
 
 
         self.params = self.relations.copy()

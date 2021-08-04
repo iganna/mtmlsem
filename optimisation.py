@@ -447,3 +447,10 @@ class OptBayes:
         return relations
 
 
+    def calc_pvals(self):
+        """
+        Calculate p-values after Bayes
+        :return:
+        """
+        #TODO: Georgy/Anna
+        pass

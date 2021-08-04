@@ -10,12 +10,12 @@ from optimisation import *
 import semopy
 import random
 import semba
-from func_util import *
+from utils import *
 
 from semopy import Model as semopyModel
 from lat_struct import *
 from optimisation import *
-from func_util import *
+from utils import *
 from unit_tests import test0, test1, test2
 
 
@@ -92,7 +92,7 @@ model = mtmlModel(model_desc=model_desc,
 
 opt1 = model.opt_bayes()
 
-print(model.unnormalize())
+print(model.unnormalize_params())
 
 #
 #

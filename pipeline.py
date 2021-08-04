@@ -5,7 +5,7 @@ from dataset import Data, CVset
 from pandas import read_csv
 from optimisation import *
 from semopy.efa import explore_cfa_model
-from func_util import *
+from utils import *
 
 path_data = 'data_cicer/'
 file_phens = path_data + 'data_phens.txt'
@@ -67,18 +67,11 @@ data = Data(d_snps=data_snps, d_phens=data_phens)
 print(data.n_samples)
 
 model = mtmlModel(data=data)
-model.get_lat_struct(cv=True, echo=True)
-model.show_mod()
+# model.get_lat_struct(cv=True, echo=True)
+# model.show_mod()
 
 model.get_lat_struct()
 model.show_mod()
-
-
-semopy_descr = explore_cfa_model(data_phens)
-show(semopy_descr)
-
-semopy_descr = explore_cfa_model(data_phens, mode='optics')
-show(semopy_descr)
 
 
 mod = model.mods['mod0']
@@ -98,3 +91,42 @@ model = model.add_snps(snp_pref=snp_pref)
 # FC1 ~ FC4
 # FC5 ~ FC1 + FC2
 # """
+
+
+
+# semopy_descr = explore_cfa_model(data.d_phens)
+# show(semopy_descr)
+#
+# semopy_descr = explore_cfa_model(data.d_phens, mode='optics')
+# show(semopy_descr)
+
+
+
+
+
+import semopy
+import semopy.model_generation as modgen
+import numpy as np
+import random
+random.seed(1)
+np.random.seed(1)
+
+desc = modgen.generate_desc(0, 0, 2, 3)
+params, aux = modgen.generate_parameters(desc)
+data = modgen.generate_data(aux, 500)
+
+lt = set(data.columns)
+for n in range(1, 21):
+    data[f'g{n}'] = np.random.normal(size=len(data))
+lfs = list()
+desc = desc.split('# S')[0]
+for i in range(0, 21):
+    if i:
+        desc += f'\neta1 ~ g{i}'
+    m = semopy.Model(desc, cov_diag=True)
+    r = m.fit(data)
+    lf = semopy.utils.calc_reduced_ml(m, lt) - lf[0]
+    lfs.append(lf)
+
+print(lfs)
+print(-np.log(lfs))

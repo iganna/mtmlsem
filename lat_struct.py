@@ -14,7 +14,7 @@ from itertools import combinations, permutations
 
 from dataset import Data, CVset
 
-from func_util import showl
+from utils import showl
 
 # Function for factor analysis
 from factor_analyzer import FactorAnalyzer
@@ -314,14 +314,16 @@ def get_structure_picea(data: Data,
     return mods
 
 
-def get_structure_picea_g(data_phens):
+def get_structure_optics(data_phens):
     """
-    Georgy
+    Get latent structure with opticks
     :return:
     """
 
     semopy_descr = explore_cfa_model(data_phens)
     showl(semopy_descr)
+
+
     pass
 
 

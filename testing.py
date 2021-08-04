@@ -9,12 +9,12 @@ from pandas import read_csv
 from optimisation import *
 import semopy
 import semba
-from func_util import *
+from utils import *
 
 from semopy import Model as semopyModel
 from lat_struct import *
 from optimisation import *
-from func_util import *
+from utils import *
 
 
 # Generate dataset
@@ -63,7 +63,7 @@ model = mtmlModel(model_desc=model_desc,
 
 model.opt_bayes()
 
-print(model.unnormalize())
+print(model.unnormalize_params())
 
 
 # -----------------------------------

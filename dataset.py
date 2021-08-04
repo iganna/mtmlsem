@@ -2,6 +2,11 @@
 Module to work with the data and to create cross-validation set
 """
 
+
+# TODO: Add geography as random variable
+# TODO: add epistatic SNPs
+#
+
 import copy
 import warnings
 import numpy as np
@@ -12,7 +17,7 @@ from semopy.utils import calc_reduced_ml
 from math import ceil
 
 
-from func_util import *
+from utils import *
 
 class PhenType:
     """
@@ -234,7 +239,7 @@ class Data:
         Estimate Kinship as in rrBLUP - Georgy
         :return: kinship
         """
-        # TODO
+        # TODO: Georgy?
         # return np.identity(self.n_samples)
         if len(self.d_snps.columns) < 2:
             raise ValueError('Kinship matrix cannot be calculated')
@@ -265,6 +270,7 @@ class Data:
         else:
             self.d_snps = d_snps
         return self.d_snps
+
 
     def set_phens(self,
                   d_phens=None,
@@ -337,6 +343,70 @@ class Data:
             self.d_phen_types[PhenType.norm] = phens_anon
 
         return self.d_phen_types
+
+
+    def impute_snps(self):
+        """
+        Imputation of SNPs as in rrBLUP
+        Together with imputation we have to remember positions of SNPs,
+        that were imputed and have a function "miss SNPs" to return everything back
+        :return:
+        """
+        # TODO: Georgy?
+        # To remember SNP positions, the were imputed?
+        self.snps_miss = [(1, 2), (3, 4)]
+        pass
+
+
+    def miss_snps(self):
+        """
+        Return SNP matrix to its initial state with missing data
+        :return:
+        """
+        # TODO: Georgy?
+        pass
+
+
+    def impure_phens(self, phens_to_impute=None):
+        """
+        Impute phenotypes
+        :return:
+        """
+        # TODO: Georgy?
+        if phens_to_impute is None:
+            phens_to_impute = self.phens
+
+        for p in phens_to_impute:
+            # imputation
+            pass
+
+
+    def miss_phens(self, phens_to_miss=None):
+        """
+        Return phenotype
+        :return:
+        """
+        # TODO: Georgy?
+        pass
+
+
+    def generate_epistasis(self, snps_to_epi=None):
+        """
+        Estend set of SNPs by generating their epistatic variant
+        :return:
+        """
+        # TODO: Anna/Georgy?
+        pass
+
+
+    def ilr(self, psi=None):
+        """
+        Transform phenotypes-frequencies to ilr coordinates
+        :return:
+        """
+        # TODO: Anna?
+        pass
+
 
 
 class CVset:

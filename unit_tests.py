@@ -9,12 +9,12 @@ from optimisation import *
 import semopy
 import semba
 import random
-from func_util import *
+from utils import *
 
 from semopy import Model as semopyModel
 from lat_struct import *
 from optimisation import *
-from func_util import *
+from utils import *
 
 
 
@@ -55,7 +55,7 @@ def test0():
                       data=data)
     model.opt_bayes()
 
-    print(model.unnormalize())
+    print(model.unnormalize_params())
 
     # -----------------------------------
     # semopy
@@ -106,7 +106,7 @@ def test1():
 
     model.opt_bayes()
 
-    print(model.unnormalize())
+    print(model.unnormalize_params())
 
     # -----------------------------------
     # semopy
@@ -173,7 +173,7 @@ def test2():
 
     model.opt_bayes()
 
-    print(model.unnormalize())
+    print(model.unnormalize_params())
 
     # -----------------------------------
     # semopy
@@ -241,7 +241,7 @@ def test3():
     np.random.seed(2346)
     opt = model.opt_bayes()
 
-    print(model.unnormalize())
+    print(model.unnormalize_params())
 
     # x = np.concatenate((opt.data['_observed'], opt.data['group1']), axis=1)
     # np.corrcoef(x.transpose())
