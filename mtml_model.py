@@ -12,6 +12,8 @@ from offspring import *
 
 from utils import *
 
+from itertools import product
+
 class mtmlModel:
 
     dict_lat_struct = {'unconnected': get_structure_unconnect,
@@ -145,9 +147,56 @@ class mtmlModel:
         :param snp_pref:
         :return:
         """
+        self.gwas = dict()
         for k, mod in self.mods.items():
-            self.mods[k] = add_snps(mod, self.data,
+            self.mods[k], self.gwas[k] = add_snps(mod, self.data,
                                     self.snp_multi_sort, snp_pref=snp_pref)
+
+
+    def add_snps_cv(self, snp_pref=None, n_cv=10):
+        """
+
+        :param snp_pref:
+        :return:
+        """
+
+        thresh_mlr_var = [0.1, 0.05, 0.01, 0.05]
+        thresh_sign_snp_var = [0.05, 0.01, 0.001]
+        thresh_abs_param_var = [0.1, 0.01, 0.001]
+
+        if self.cv_data is None:
+            self.cv_data = CVset(dataset=self.data, n_cv=n_cv)
+
+
+        gwas_cv = []
+        for i_cv in range(n_cv):
+            gwas = dict()
+            for k, mod in self.mods.items():
+                _, gwas[k] = add_snps(mod, self.cv_data.train[i_cv],
+                                      self.snp_multi_sort,
+                                      snp_pref=snp_pref,
+                                      n_iter=1)
+            gwas_cv += [gwas]
+
+
+        # for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
+        #         product(*[thresh_mlr_var,
+        #                             thresh_sign_snp_var,
+        #                             thresh_abs_param_var]):
+        #
+        #     print(thresh_mlr, thresh_sign_snp, thresh_abs_param)
+        #
+        #     for i_cv in range(n_cv):
+        #
+        #         for v, tmp in gwas_cv[i_cv].items():
+        #             # Zero means that one 1 SNPs was added
+        #             snp_list = [snp for snp, fit_delta, param_val, pval in tmp[0]
+        #                         if fit_delta > thresh_mlr and
+        #                         param_val > thresh_abs_param_var and
+        #                         pval < thresh_sign_snp_var]
+        #         break
+
+
 
 
     def usefulness(self):

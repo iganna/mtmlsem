@@ -74,16 +74,17 @@ model.get_lat_struct()
 model.show_mod()
 
 
-mod = model.mods['mod0']
-variable = 'F0'
-show(mod)
+# mod = model.mods['mod0']
+# variable = 'F0'
+# show(mod)
+#
+#
+# thresh_mlr = 0.01
+# thresh_sign_snp = 0.05
+# thresh_abs_param = 0.001
+# n_iter=10
 
-
-thresh_mlr = 0.01
-thresh_sign_snp = 0.05
-thresh_abs_param = 0.001
-
-model = model.add_snps(snp_pref=snp_pref)
+model.add_snps(snp_pref=snp_pref)
 
 #
 # descr = """ FC1 ~ FC2
