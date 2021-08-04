@@ -1,7 +1,6 @@
 # mtmlSEM
 
 Construction and estimation of mtmlSEM models
-^__^
 
 ## Description
 
