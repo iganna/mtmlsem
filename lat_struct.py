@@ -280,7 +280,7 @@ def get_structure_picea(data: Data,
             if len(factors) == 0:
                 factors = fa.transform(d_factors.loc[:, phens])
             else:
-                factors = np.concatenate((factors,fa.transform(d_factors.loc[:, phens])), axis=1)
+                factors = np.concatenate((factors, fa.transform(d_factors.loc[:, phens])), axis=1)
 
         d_factors_tmp = pd.DataFrame(factors,
                                  columns=[f'{f_pref}{i+n_f}' for i in range(factors.shape[1])],

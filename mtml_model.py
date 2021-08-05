@@ -148,7 +148,7 @@ class mtmlModel:
         """
         self.gwas = dict()
         for k, mod in self.mods.items():
-            self.mods[k], self.gwas[k] = add_snps(mod, self.data,
+            self.mods[k], self.gwas[k], _ = add_snps(mod, self.data,
                                                   snp_pref=snp_pref,
                                                   n_iter=n_iter)
 
@@ -176,8 +176,8 @@ class mtmlModel:
 
 
 
-        thresh_mlr_var = [0.5, 0.1]
-        thresh_sign_snp_var = [0.05, 0.01, 0.001]
+        thresh_mlr_var = [0.1, 0.01]
+        thresh_sign_snp_var = [0.05, 0.01]
         thresh_abs_param_var = [0.1]
 
         res = []

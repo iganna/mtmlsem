@@ -90,9 +90,10 @@ n_cv = 4
 # show(mod)
 #
 #
-# thresh_mlr = 0.01
-# thresh_sign_snp = 0.05
-# thresh_abs_param = 0.001
+thresh_mlr = 0.1
+thresh_sign_snp = 0.05
+thresh_abs_param = 0.1
+mod = model.mods['mod0']
 # n_iter=10
 
 # model.set_mod_description(model_desc = 'F0 =~ 1.0 * PodsWeight\nF0 =~ 1.9931618000824256 * PodsNumber\nF0 =~ 1.8888181183451012 * SeedsNumber\nF0 =~ 1.9501172747547924 * SeedsWeight\nF0 ~ -0.1993323065511346*Ca7_30930779\nF0 ~ -0.14915660198053338*Ca5_39720969')
