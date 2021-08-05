@@ -11,7 +11,7 @@ from dataset import *
 
 class OptBayes:
 
-    t_lat, t_obs, t_ord, t_m = ['_latent', '_observed', '_ordinal', '_mean']
+    t_lat, t_obs, t_ord, t_m, t_nan = ['_latent', '_observed', '_ordinal', '_mean', '_nan']
     def __init__(self, relations,
                  data: Data,
                  random_effects=None,
@@ -61,6 +61,10 @@ class OptBayes:
         self.data = dict()
         self.data[self.t_lat] = np.random.rand(self.n, len(self.v[self.t_lat]))
         self.data[self.t_obs] = data.d_all.loc[:, self.v[self.t_obs]].to_numpy()
+
+        # # Additional tips with missing data
+        # self.data[self.t_nan] = 1 - np.isnan(self.data[self.t_obs])
+
         # add random effects to data
         for v_reff in random_effects:
             self.data[v_reff] = data.r_eff[v_reff].z.transpose()
@@ -192,8 +196,8 @@ class OptBayes:
     def optimize(self, n_mcmc = 1000):
 
         # print(f'n lat {self.n_lat}')
-        for _ in range(n_mcmc):
-
+        for i_mcmc in range(n_mcmc):
+            # print(i_mcmc)
 
             if self.n_lat > 0:
                 self.update_latent()
@@ -204,8 +208,6 @@ class OptBayes:
             for ieq in range(self.n_eq):
                 self.update_params(ieq)
 
-                # if len(self.reff[ieq]) > 0:
-                #     self.update_reff(ieq)
 
             # print(self.e)
 
@@ -317,6 +319,9 @@ class OptBayes:
         # Inverse matrix for Lambda
         mx_lambda_inv = np.linalg.pinv(mx_lambda)
 
+        # # missing data
+        # mx_pg[np.isnan(mx_pg)] = np.mean(mx_pg[np.isnan(mx_pg)==False])
+
         # from structural part
         mu1 = mx_c @ mx_pg
         sigma1 = mx_c @ np.diag(psi1) @ mx_c.transpose()
@@ -354,16 +359,21 @@ class OptBayes:
         priors = self.priors[ieq]
         p_cov_inv = self.p_cov_inv[ieq]
 
+        # TODO make it faster
         # Values for influencing variables
         x = np.array([self.data[t][:, i] for t, i in exo])
+        # x_miss = 1 - np.isnan(x)
+        # x[np.isnan(x)] = 0
+
         # Values for the dependent variable
         z = 0 + self.data[endo[0]][:, endo[1]]
-        # # REMOVE RANDOM EFFECT
-        # if len(self.reff[ieq]) > 0:
-        #     z -= self.calc_reff(ieq)
+        # z_miss = 1 - np.isnan(z)
+        # z[np.isnan(z)] = 0
 
-        xx = x @ x.transpose()
-        zx = z @ x.transpose()
+
+        xx = (x @ x.transpose()) #/  (x_miss @ x_miss.transpose()) * self.n
+        zx = (z @ x.transpose()) #/ (z_miss @ x_miss.transpose()) * self.n
+
 
         phi_inv = xx + p_cov_inv #+ np.identity(len(x))
         phi = np.linalg.inv(phi_inv)

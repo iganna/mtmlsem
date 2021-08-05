@@ -44,7 +44,8 @@ class Data:
                  ord_vars_flag=True,
                  ord_vars_thresh=3,
                  echo=False,
-                 show_warning=True):
+                 show_warning=True,
+                 impute=True):
         """
 
         :param d_snps:
@@ -86,6 +87,13 @@ class Data:
 
         self.d_snps = self.d_snps.loc[self.samples]
         self.d_phens = self.d_phens.loc[self.samples]
+
+        if impute:
+            print('Imputation of phenotypes..')
+            self.impute_phens()
+            print('Imputation of snps..')
+            self.impute_snps()
+            print('Imputation is done.')
 
         # Check names of variables: they must start with letters
         check_names(self.snps)
@@ -146,7 +154,7 @@ class Data:
     def d_all(self):
         return concat([self.d_phens, self.d_snps], axis=1)
 
-    def subdata(self,smpl_ids=None, smpl_names=None):
+    def subdata(self, smpl_ids=None, smpl_names=None):
         """
         Get Data object for the subset of samples.
         User can provide either names or IDs or samples.
@@ -185,7 +193,8 @@ class Data:
                         d_phens=raw_phens,
                         d_phen_types=self.d_phen_types,
                         estim_kinship=False,
-                        show_warning=False)
+                        show_warning=False,
+                        impute=False)
         # random variables
         data_sub.r_eff.update({s: v.get_subset(smpl_ids)
                                for s, v in self.r_eff.items()})
@@ -345,7 +354,7 @@ class Data:
         return self.d_phen_types
 
 
-    def impute_snps(self):
+    def impute_snps(self, kiship_cutoff=0.8):
         """
         Imputation of SNPs as in rrBLUP
         Together with imputation we have to remember positions of SNPs,
@@ -354,8 +363,35 @@ class Data:
         """
         # TODO: Georgy?
         # To remember SNP positions, the were imputed?
-        self.snps_miss = [(1, 2), (3, 4)]
-        pass
+        self.snps_miss = np.where(self.d_snps.isna())
+
+        if len(self.snps_miss[0]) == 0:
+            return
+        # TODO: change to real kinship?
+
+        while True:
+            kinship = self.d_snps.transpose().corr()
+            kinship[kinship < kiship_cutoff] = 0
+            # Set diagonal elements to 0
+            kinship.values[[np.arange(kinship.shape[0])] * 2] = 0
+
+            # To make the sum of each row queal to 1
+            kinship = kinship.div(kinship.sum(), axis=0)
+
+            if kinship.isna().sum().sum() == 0:
+                break
+            else:
+                kiship_cutoff *= 0.9
+
+        self.d_snps[self.d_snps.isna()] = 0
+        tmp = kinship @ self.d_snps
+
+        for i, j in zip(*self.snps_miss):
+            self.d_snps.iloc[i, j] = tmp.iloc[i, j]
+
+        if self.d_snps.isna().sum().sum() != 0:
+            raise ValueError('Imputation was broken')
+
 
 
     def miss_snps(self):
@@ -367,18 +403,37 @@ class Data:
         pass
 
 
-    def impure_phens(self, phens_to_impute=None):
+    def impute_phens(self, kiship_cutoff=0.8):
         """
         Impute phenotypes
         :return:
         """
         # TODO: Georgy?
-        if phens_to_impute is None:
-            phens_to_impute = self.phens
 
-        for p in phens_to_impute:
-            # imputation
-            pass
+        self.phens_miss = np.where(self.d_phens.isna())
+        if len(self.phens_miss[0]) == 0:
+            return
+
+        # TODO: change to real kinship?
+        while True:
+            kinship = self.d_snps.transpose().corr()
+            kinship[kinship < kiship_cutoff] = 0
+            # Set diagonal elements to 0
+            kinship.values[[np.arange(kinship.shape[0])] * 2] = 0
+
+            # To make the sum of each row queal to 1
+            kinship = kinship.div(kinship.sum(), axis=0)
+
+            if kinship.isna().sum().sum() == 0:
+                break
+            else:
+                kiship_cutoff *= 0.9
+
+        self.d_phens[self.d_phens.isna()] = 0
+        tmp = kinship @ self.d_phens
+
+        for i, j in zip(*self.phens_miss):
+            self.d_phens.iloc[i, j] = tmp.iloc[i, j]
 
 
     def miss_phens(self, phens_to_miss=None):

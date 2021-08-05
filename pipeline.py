@@ -7,16 +7,16 @@ from optimisation import *
 from semopy.efa import explore_cfa_model
 from utils import *
 
-path_data = 'data_cicer/'
-file_phens = path_data + 'data_phens.txt'
-file_snps = path_data + 'snp_2579_renamed.txt'
-snp_pref = 'Ca'
+# path_data = 'data_cicer/'
+# file_phens = path_data + 'data_phens.txt'
+# file_snps = path_data + 'snp_2579_renamed.txt'
+# snp_pref = 'Ca'
 
 
-# path_data = 'data_soy/'
-# file_phens = path_data + 'soy_phens.txt'
-# file_snps = path_data + 'soy_snps.txt'
-# snp_pref = None
+path_data = 'data_soy/'
+file_phens = path_data + 'soy_phens.txt'
+file_snps = path_data + 'soy_snps.txt'
+snp_pref = None
 #
 #
 # path_data = 'data_vigna/'
@@ -46,6 +46,10 @@ data_phens.isna().sum(axis=0)
 # data_phens = data_phens.iloc[:, ['Oil' not in s for s in data_phens.columns.to_list() ]]
 # data_phens = data_phens.iloc[:, ['Protein' not in s for s in data_phens.columns.to_list() ]]
 # # data_phens = data_phens.iloc[:, ['ilr' not in s for s in data_phens.columns.to_list() ]]
+
+# ---------------------
+# for soy paper
+data_phens = data_phens.loc[:, ['Productivity', 'ilr1', 'ilr2']]
 # ---------------------
 # # for flax
 # data_phens = data_phens.loc[data_phens['Batch'] == 'Big', :]
@@ -63,8 +67,9 @@ data_snps = read_csv(file_snps, sep='\t', index_col=0)
 
 
 
-data = Data(d_snps=data_snps, d_phens=data_phens)
+data = Data(d_snps=data_snps, d_phens=data_phens, impute=False)
 print(data.n_samples)
+self = data
 
 model = mtmlModel(data=data)
 # model.get_lat_struct(cv=True, echo=True)
@@ -72,6 +77,12 @@ model = mtmlModel(data=data)
 
 model.get_lat_struct()
 model.show_mod()
+
+self = model
+n_cv = 4
+
+
+# model.add_snps(snp_pref=snp_pref)
 
 
 # mod = model.mods['mod0']
@@ -84,7 +95,11 @@ model.show_mod()
 # thresh_abs_param = 0.001
 # n_iter=10
 
-model.add_snps(snp_pref=snp_pref)
+# model.set_mod_description(model_desc = 'F0 =~ 1.0 * PodsWeight\nF0 =~ 1.9931618000824256 * PodsNumber\nF0 =~ 1.8888181183451012 * SeedsNumber\nF0 =~ 1.9501172747547924 * SeedsWeight\nF0 ~ -0.1993323065511346*Ca7_30930779\nF0 ~ -0.14915660198053338*Ca5_39720969')
+# model.show_mod()
+
+
+model.opt_bayes()
 
 #
 # descr = """ FC1 ~ FC2

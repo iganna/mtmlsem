@@ -15,11 +15,17 @@ from utils import *
 from itertools import product
 
 
+class Hyperparams:
+    thresh_mlr = 0.01
+    thresh_sign_snp = 0.05
+    thresh_abs_param = 0.1
+
+
 def add_snps(mod,
              data: Data,
-             thresh_mlr=0.01,
+             thresh_mlr=0.5,
              thresh_sign_snp=0.05,
-             thresh_abs_param=0.001,
+             thresh_abs_param=0.1,
              snp_pref=None,
              n_iter=10):
     """
@@ -38,44 +44,45 @@ def add_snps(mod,
     # sem_mod.fit(concat([data.d_phens, data.d_snps], axis=1))
     sem_mod.fit(data.d_all)
     mod_init = '\n'.join(parse_descr(sem_mod=sem_mod))
-    show(mod_init)
+    # show(mod_init)
 
     sem_mod_init = fix_variances(semopyModel(mod_init, cov_diag=True))
     sem_mod_init.fit(data.d_all)
 
     gwas = dict()
+    snps_added = dict()
     for variable in vars_lat_ord:
-        print(variable)
-        print(mod_init)
+        # print(variable)
+        # print(mod_init)
         print('-----------')
-        mod_init, snp_lists_var = add_snps_for_variable(mod_init, data, variable,
+        mod_init, gwas[variable], snps_added[variable] = add_snps_for_variable(mod_init, data, variable,
                                       thresh_mlr=thresh_mlr,
                                       thresh_sign_snp=thresh_sign_snp,
                                       thresh_abs_param=thresh_abs_param,
                                       snp_pref=snp_pref,
                                          n_iter=n_iter)
-        gwas[variable] = snp_lists_var
-        print(mod_init)
+        show(mod_init)
         print('-----------')
         print('-----------')
 
     # form specific variables instead of latent ones
 
-    return mod_init, gwas
+    return mod_init, gwas, snps_added
 
 
 
 def add_snps_for_variable(mod,
                           data: Data,
                           variable,
-                          thresh_mlr=0.001,
+                          thresh_mlr=0.5,
                           thresh_sign_snp=0.05,
-                          thresh_abs_param=0.001,
+                          thresh_abs_param=0.1,
                           snp_pref=None,
-                          n_iter=10):
+                          n_iter=100):
     snp_lists = []
     snp_skip = []
     mod_init = f'{mod}'
+    snps_added = []
     for _ in range(n_iter):
         mod_new, snp_skip, snp_list = \
             one_snp_for_variable(mod_init, data, variable,
@@ -89,8 +96,10 @@ def add_snps_for_variable(mod,
             print('NO SNPs added')
             break
         mod_init = mod_new
+        show(mod_init)
+        snps_added += [snp_skip[-1]]
 
-    return mod_init, snp_lists
+    return mod_init, snp_lists, snps_added
 
 
 def one_snp_for_variable(mod_init,
@@ -100,7 +109,8 @@ def one_snp_for_variable(mod_init,
                          thresh_mlr,
                          thresh_sign_snp,
                          thresh_abs_param,
-                         snp_pref=None,):
+                         snp_pref=None,
+                         echo=False):
     """
     This fucntion tests SNPs and add one SNP for a variable
     :param mod_init: model with some fixed parameters
@@ -123,7 +133,6 @@ def one_snp_for_variable(mod_init,
     sem_mod_zero = fix_variances(semopyModel(mod_zero, cov_diag=True))  # with tmp variable, but fixed influence to 0
 
 
-
     # New data
     snp_all = data.snps
     if snp_pref is not None:
@@ -133,32 +142,33 @@ def one_snp_for_variable(mod_init,
 
     data_tmp = concat([data.d_phens[phens_in], data.d_snps[snp_in]], axis=1)
     data_tmp[v_tmp] = np.zeros(data.n_samples)
-    snp = data.snps[0]
+    snp = data.snps[0]  #'Ca1_101073'
     # snp = 'Ca3_28437425'
     data_tmp[v_tmp] = data.d_snps[snp]
 
     # Fit models
     sem_mod_init.fit(data_tmp, clean_slate=True)
     sem_mod_zero.fit(data_tmp, clean_slate=True)
-    sem_mod_tmp.fit(data_tmp, clean_slate=True)
+    sem_mod_tmp.fit(data_tmp, clean_slate=True)  # 11.896190990354398
 
     # data_tmp[v_tmp] = data.d_snps['Ca3_28437425']
-    # sem_mod_tmp.fit(data_tmp, clean_slate=True)
+    # sem_mod_tmp.fit(data_tmp, clean_slate=True)  # 12.96532468871669
 
 
     fit_init_reduced = calc_reduced_ml(sem_mod_init, data.phens)
     fit_zero_reduced = calc_reduced_ml(sem_mod_zero, data.phens)
     fit_tmp_reduced = calc_reduced_ml(sem_mod_tmp, data.phens)
 
-    print(fit_zero_reduced, fit_init_reduced)
+    if echo:
+        print(fit_zero_reduced, fit_init_reduced)
+
     if abs(fit_zero_reduced - fit_init_reduced) > 0.01:
         raise ValueError('Something is going wring')
 
     # Try all SNPs
-
+    if echo:
+        print(f'Skip {len(snp_skip)} SNPs')
     snp_list = []
-    print(f'Skip {len(snp_skip)} SNPs')
-
     for snp in snp_all:
 
         if snp in snp_skip:
@@ -169,7 +179,7 @@ def one_snp_for_variable(mod_init,
 
             data_tmp[v_tmp] = data.d_snps[snp]
             # TODO: remove the next line
-            sem_mod_tmp = fix_variances(semopyModel(mod_tmp, cov_diag=True))
+            # sem_mod_tmp = fix_variances(semopyModel(mod_tmp, cov_diag=True))
 
             sem_mod_tmp.fit(data_tmp, clean_slate=True)
             fit_tmp_reduced = calc_reduced_ml(sem_mod_tmp, data.phens)
@@ -210,30 +220,30 @@ def one_snp_for_variable(mod_init,
             continue
 
 
-
-
     # If no SNPs improves the model
     if len(snp_list) == 0:
-        return None, snp_skip
+        return None, snp_skip, snp_list
 
     # print(snp_list)
 
     # Get the best SNP
-    snp_max, snp_val, fit_delta = get_best_snp(snp_list)
+    snp_max, snp_val, fit_delta = get_best_snp([v for v in snp_list
+                                                if v[0] not in snp_skip])
+    if snp_max is None:
+        return None, snp_skip, snp_list
+
     snp_skip += [snp_max]  # To remove from further consideration
 
     # Add SNP to the model
     mod_max = f'{mod_init}\n{variable} ~ {snp_val}*{snp_max}'
-    data_tmp[snp_max] = data.d_snps[snp_max]
-    sem_mod_max = fix_variances(semopyModel(mod_max, cov_diag=True))
-    sem_mod_max.fit(data_tmp, clean_slate=True)
 
 
-    fit_max_reduced = calc_reduced_ml(sem_mod_max, data.phens)
-
-
-    # showl([fit_init_reduced, fit_max_reduced, fit_delta])
-    print(fit_init_reduced - fit_max_reduced - fit_delta)
+    if echo:
+        data_tmp[snp_max] = data.d_snps[snp_max]
+        sem_mod_max = fix_variances(semopyModel(mod_max, cov_diag=True))
+        sem_mod_max.fit(data_tmp, clean_slate=True)
+        fit_max_reduced = calc_reduced_ml(sem_mod_max, data.phens)
+        print(fit_init_reduced - fit_max_reduced - fit_delta)
 
     return mod_max, snp_skip, snp_list
 
@@ -244,6 +254,8 @@ def get_best_snp(snp_list):
     :param snp_list: list of SNPs with log-likelihood values
     :return: name of the best SNP anf its loading value
     """
+    if len(snp_list) == 0:
+        return None, 0, 0
     # Get the best SNP
     snp_max = ''
     snp_val = 0
@@ -313,7 +325,7 @@ def sem_traversing(descr):
         var_exo = var_exo_new
 
     var_order += diff(var_all, var_order)
-    showl(var_order)
+    # showl(var_order)
 
     return var_order
 
