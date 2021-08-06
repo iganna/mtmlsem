@@ -22,6 +22,49 @@ class Hyperparams:
     thresh_abs_param = 0.1
 
 
+def add_snps_residuals_cv(mod,
+                         data: Data,
+                         thresh_mlr=Hyperparams.thresh_mlr,
+                         thresh_sign_snp=Hyperparams.thresh_sign_snp,
+                         thresh_abs_param=Hyperparams.thresh_abs_param,
+                         snp_pref=None,
+                         n_iter=10):
+    n_cv = 4
+    cv_data = CVset(dataset=data, n_cv=n_cv)
+
+    thresh_mlr_var = [0.1, 0.05, 0.01]
+    thresh_sign_snp_var = [0.05, 0.01]
+    thresh_abs_param_var = [0.1, 0.01]
+
+    gwas_cv = []
+    snps_added_cv = []
+    for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
+            product(*[thresh_mlr_var,
+                      thresh_sign_snp_var,
+                      thresh_abs_param_var]):
+        print(thresh_mlr, thresh_sign_snp, thresh_abs_param)
+        gwas = []
+        snps_added = []
+        for i_cv in range(n_cv):
+            gwas_tmp, snps_added_tmp = \
+                add_snps_residuals(mod=mod,
+                                   data=cv_data.train[i_cv],
+                                   thresh_mlr=thresh_mlr,
+                                   thresh_sign_snp=thresh_sign_snp,
+                                   thresh_abs_param=thresh_abs_param,
+                                   snp_pref=snp_pref,
+                                   n_iter=10)
+
+            gwas += [gwas_tmp]
+            snps_added += [snps_added_tmp]
+
+        gwas_cv += [gwas]
+        snps_added_cv += [snps_added]
+
+
+
+
+
 def add_snps_residuals(mod,
                          data: Data,
                          thresh_mlr=Hyperparams.thresh_mlr,
@@ -31,6 +74,7 @@ def add_snps_residuals(mod,
                          n_iter=10):
 
     sem_mod = semopyModel(mod)
+    sem_mod.fit(data.d_all)
     relations = sem_mod.inspect()
     relations = relations.loc[relations['op'] == '~', :]
     phens = [v for v in sem_mod.vars['all'] if v in data.phens]
@@ -49,40 +93,70 @@ def add_snps_residuals(mod,
         fa.fit(d)
         f_val = fa.transform(d)
         f_val = f_val.transpose()[0]
+        data.d_phens[f] = f_val
+        new_var_names += [f]
 
 
 
     gwas = dict()
     snps_added = dict()
     # for variable in vars_lat_ord:
-    for variable in vars_lat_ord:
+    for f in vars_lat_ord:
+        print('-----------')
         mod_init = ''
         # print(variable)
         # print(mod_init)
+        mod_fact, gwas[f], snps_added[f] = \
+            add_snps_for_variable(mod_init, data, f,
+                                      thresh_mlr=thresh_mlr,
+                                      thresh_sign_snp=thresh_sign_snp,
+                                      thresh_abs_param=thresh_abs_param,
+                                  # n_iter=n_iter,
+                                      snp_pref=snp_pref)
+
+        sem_mod_f = semopyModel(mod_fact)
+        relations_f = sem_mod_f.inspect()
+        relations_f = relations_f.loc[relations_f['op'] == '~', :]
+
+        f_val = 0
+        for snp, snp_val in zip(relations_f['rval'], relations_f['Estimate']):
+            f_val += data.d_snps[snp] * snp_val
+
+        data.d_phens[f] = f_val
+
         print('-----------')
-        mod_init, gwas[variable], snps_added[variable] = \
-            add_snps_for_variable(mod_init, data, variable,
+
+    return gwas, snps_added
+
+    print(phens)
+    for p in phens:
+        relations_p = relations.loc[relations['lval'] == p, :]
+        p_est = 0
+        for var, snp_val in zip(relations_p['rval'], relations_p['Estimate']):
+            p_est += data.d_all[var] * snp_val
+
+        p_val = d.loc[:, p]
+        p_res = p_val - p_est * np.dot(p_est, p_val) / np.dot(p_est, p_est)
+
+        p_res_name = f'residual_{p}'
+        data.d_phens[p_res_name] = p_res
+        new_var_names += [p_res_name]
+
+        print('-----------')
+        mod_init = ''
+        mod_fact, gwas[p], snps_added[p] = \
+            add_snps_for_variable(mod_init, data, p_res_name,
                                       thresh_mlr=thresh_mlr,
                                       thresh_sign_snp=thresh_sign_snp,
                                       thresh_abs_param=thresh_abs_param,
                                   # n_iter=n_iter,
                                       snp_pref=snp_pref)
         print('-----------')
-        print('-----------')
 
-    # TODO: estimate all factors and remove from phenotypes
-    # for p in phens:
-    #     f =
-    #     data.d_phens[f] = f_val
-    #     new_var_names += [f]
-    #     for p in phens_f:
-    #         p_val = d.loc[:, p]
-    #         p_res = p_val - f_val * np.dot(f_val, p_val) / np.dot(f_val, f_val)
-    #
-    #         p_res_name = f'residual_{p}'
-    #         data.d_phens[p_res_name] = p_res
-    #         new_var_names += [p_res_name]
-
+    data.d_phens = data.d_phens.loc[:,
+                   [v for v in data.d_phens.columns
+                    if v not in new_var_names]]
+    return gwas, snps_added
 
 
 def add_snps(mod,
