@@ -6,6 +6,14 @@ from pandas import read_csv
 from optimisation import *
 from semopy.efa import explore_cfa_model
 from utils import *
+from add_snps import *
+
+from multiprocess import Pool
+
+
+import pickle
+
+
 
 # path_data = 'data_cicer/'
 # file_phens = path_data + 'data_phens.txt'
@@ -94,56 +102,74 @@ thresh_mlr = 0.1
 thresh_sign_snp = 0.05
 thresh_abs_param = 0.1
 mod = model.mods['mod0']
-# n_iter=10
 
-# model.set_mod_description(model_desc = 'F0 =~ 1.0 * PodsWeight\nF0 =~ 1.9931618000824256 * PodsNumber\nF0 =~ 1.8888181183451012 * SeedsNumber\nF0 =~ 1.9501172747547924 * SeedsWeight\nF0 ~ -0.1993323065511346*Ca7_30930779\nF0 ~ -0.14915660198053338*Ca5_39720969')
-# model.show_mod()
+n_cv = 4
+cv_data = CVset(dataset=data, n_cv=n_cv)
+
+thresh_mlr_var = [0.1, 0.05, 0.01]
+thresh_sign_snp_var = [0.05, 0.01]
+thresh_abs_param_var = [0.1, 0.01]
 
 
-model.opt_bayes()
+thresh_variants = list(product(*[thresh_mlr_var,
+                  thresh_sign_snp_var,
+                  thresh_abs_param_var]))
 
+def func(i_variant):
+    thresh_mlr, thresh_sign_snp, thresh_abs_param = thresh_variants[i_variant]
+    gwas = []
+    snps_added = []
+
+    # return gwas, snps_added
+
+    for i_cv in range(n_cv):
+        gwas_tmp, snps_added_tmp = \
+            add_snps_residuals(mod=mod,
+                               data=cv_data.train[i_cv],
+                               thresh_mlr=thresh_mlr,
+                               thresh_sign_snp=thresh_sign_snp,
+                               thresh_abs_param=thresh_abs_param,
+                               snp_pref=snp_pref,
+                               n_iter=10)
+
+        gwas += [gwas_tmp]
+        snps_added += [snps_added_tmp]
+
+    return gwas, snps_added
 #
-# descr = """ FC1 ~ FC2
-# FC4 ~ FC3
-# FC1 ~ FC4
-# FC5 ~ FC1 + FC2
-# """
-
-
-
-# semopy_descr = explore_cfa_model(data.d_phens)
-# show(semopy_descr)
+# gwas_cv = []
+# snps_added_cv = []
+# for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
+#         thresh_variants:
+#     print(thresh_mlr, thresh_sign_snp, thresh_abs_param)
+#     gwas = []
+#     snps_added = []
+#     for i_cv in range(n_cv):
+#         gwas_tmp, snps_added_tmp = \
+#             add_snps_residuals(mod=mod,
+#                                data=cv_data.train[i_cv],
+#                                thresh_mlr=thresh_mlr,
+#                                thresh_sign_snp=thresh_sign_snp,
+#                                thresh_abs_param=thresh_abs_param,
+#                                snp_pref=snp_pref,
+#                                n_iter=10)
 #
-# semopy_descr = explore_cfa_model(data.d_phens, mode='optics')
-# show(semopy_descr)
+#         gwas += [gwas_tmp]
+#         snps_added += [snps_added_tmp]
+#
+#     gwas_cv += [gwas]
+#     snps_added_cv += [snps_added]
 
 
 
+n_thr = 2
+with Pool(n_thr) as workers:
+    pmap = workers.map
+    res = pmap(func, range(2))
 
+with open('res.obj', 'wb') as file:
+    pickle.dump(res, file)
 
-import semopy
-import semopy.model_generation as modgen
-import numpy as np
-import random
-random.seed(1)
-np.random.seed(1)
+with open('res.obj', 'rb') as file:
+    res1 = pickle.load(file)
 
-desc = modgen.generate_desc(0, 0, 2, 3)
-params, aux = modgen.generate_parameters(desc)
-data = modgen.generate_data(aux, 500)
-
-lt = set(data.columns)
-for n in range(1, 21):
-    data[f'g{n}'] = np.random.normal(size=len(data))
-lfs = list()
-desc = desc.split('# S')[0]
-for i in range(0, 21):
-    if i:
-        desc += f'\neta1 ~ g{i}'
-    m = semopy.Model(desc, cov_diag=True)
-    r = m.fit(data)
-    lf = semopy.utils.calc_reduced_ml(m, lt) - lf[0]
-    lfs.append(lf)
-
-print(lfs)
-print(-np.log(lfs))

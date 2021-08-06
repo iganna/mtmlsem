@@ -12,6 +12,8 @@ from offspring import *
 
 from utils import *
 
+from itertools import product, combinations
+
 class mtmlModel:
 
     dict_lat_struct = {'unconnected': get_structure_unconnect,
@@ -25,7 +27,6 @@ class mtmlModel:
                  phens_under_kinship=None,
                  random_effects=None,
                  n_cv=None,
-                 snp_multi_sort=True,
                  lat_struct_type=list(dict_lat_struct.keys())[0],
                  opt_type='bayes'):
         """
@@ -94,9 +95,6 @@ class mtmlModel:
         # parameters to construct latent structure
         self.lat_struct_type = self.set_lat_struct(lat_struct_type)
 
-        # Parameters to add SNPs
-        self.snp_multi_sort = snp_multi_sort
-
         # Parameters to estimate model parameters
         self.opt_type = self.set_opt_type(opt_type)
 
@@ -139,15 +137,127 @@ class mtmlModel:
         # res = opt()
 
 
-    def add_snps(self, snp_pref=None):
+    def add_snps(self, snp_pref=None, n_iter=100):
         """
         Add SNPs to each model
+        gwas: dictionary with keys of modes;
+        each item in gwas is a dictionary with keys of variables
+        each item there is the gwas for iteration for adding a SNPs
         :param snp_pref:
         :return:
         """
+        self.gwas = dict()
         for k, mod in self.mods.items():
-            self.mods[k] = add_snps(mod, self.data,
-                                    self.snp_multi_sort, snp_pref=snp_pref)
+            self.mods[k], self.gwas[k], _ = add_snps(mod, self.data,
+                                                  snp_pref=snp_pref,
+                                                  n_iter=n_iter)
+
+
+    def add_snps_cv(self, snp_pref=None, n_cv=4):
+        """
+
+        :param snp_pref:
+        :return:
+        """
+
+        def jaccard(s1, s2):
+            """
+            Jaccard similarity index
+            """
+            if len(s1) == 0:
+                return 0
+            if len(s2) == 0:
+                return 0
+            return len(set(s1) & set(s2)) / len(set(s1) | set(s2))
+
+
+        if self.cv_data is None:
+            self.cv_data = CVset(dataset=self.data, n_cv=n_cv)
+
+
+
+        thresh_mlr_var = [0.1, 0.01]
+        thresh_sign_snp_var = [0.05, 0.01]
+        thresh_abs_param_var = [0.1]
+
+        res = []
+        for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
+                product(*[thresh_mlr_var,
+                          thresh_sign_snp_var,
+                          thresh_abs_param_var]):
+
+            gwas_cv = []
+            for i_cv in range(n_cv):
+                gwas = dict()
+                snps_added = dict()
+                for k, mod in self.mods.items():
+                    _, gwas[k], snps_added[k] = add_snps(mod, self.cv_data.train[i_cv],
+                                          snp_pref=snp_pref,
+                                          thresh_mlr=thresh_mlr,
+                                          thresh_sign_snp=thresh_sign_snp,
+                                          thresh_abs_param=thresh_abs_param)
+                gwas_cv += [gwas]
+
+            res += [gwas_cv]
+
+
+
+        thresh_mlr_var = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01]
+        thresh_sign_snp_var = [0.05, 0.01, 0.001, 0.0001]
+        thresh_abs_param_var = [0.1, 0.01]
+
+
+
+
+        res = []
+        for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
+                product(*[thresh_mlr_var,
+                          thresh_sign_snp_var,
+                          thresh_abs_param_var]):
+
+            # print(thresh_mlr, thresh_sign_snp, thresh_abs_param)
+
+            snp_list_cv = []
+            for i_cv in range(n_cv):
+                snp_list = dict()
+                for k_mod, gwas in gwas_cv[i_cv].items():  # keys are models
+                    # Zero means that one 1 SNPs was added
+                    for k_var, tmp in gwas.items():  # keys are names of
+                        snp_list[f'{k_mod}_{k_var}'] = \
+                            [snp for snp, fit_delta, param_val, pval in tmp[0]
+                             if fit_delta > thresh_mlr and
+                             param_val > thresh_abs_param and
+                             pval < thresh_sign_snp]
+                snp_list_cv += [snp_list]
+
+            jacc = []
+            n_list = []
+            for k in snp_list_cv[0].keys():
+                jacc_k = []
+                for i_cv, j_cv in combinations(range(n_cv), 2):
+                    jac_tmp = jaccard(snp_list_cv[i_cv][k], snp_list_cv[j_cv][k])
+                    jacc += [jac_tmp]
+                    n_list += [len(snp_list_cv[i_cv][k]), len(snp_list_cv[j_cv][k])]
+                    jacc_k += [jac_tmp]
+                # print(k, np.mean(jacc_k))
+
+            jacc_mean = np.mean(jacc)
+            # jacc_mean = np.quantile(jacc, 0.25)
+
+            print(thresh_mlr, thresh_sign_snp, thresh_abs_param, jacc_mean, np.mean(n_list))
+            res += [[thresh_mlr, thresh_sign_snp, thresh_abs_param, jacc_mean, np.mean(n_list)]]
+
+
+        jacc_max = 0
+        i_max = -1
+        for i in range(len(res)):
+            if res[i][3] > jacc_max:
+                i_max = i
+                jacc_max = res[i][3]
+
+        res[i_max]
+
+
 
 
     def usefulness(self):
@@ -259,9 +369,10 @@ class mtmlModel:
     # ---------------------------------------------
     # Set functions with checks
     def set_mod_description(self,
+                            model_desc=None,
                             model_file=None,
                             model_sem: semopyModel = None,
-                            model_desc=None):
+                            append=False):
         """
         Set the model from file or from the semopy Model
         :param model_file:
@@ -278,8 +389,7 @@ class mtmlModel:
             return dict()
 
         if model_sem is not None:
-            self.sems = model_sem
-            return self.sems
+            model_desc = model_sem.description
 
         if model_file is not None:
             check_file(model_file)
@@ -288,10 +398,15 @@ class mtmlModel:
                 show(model_desc)
 
         # Check correspondence between data and model
+        # TODO: Georgy/Anna
         sem_tmp = semopyModel(model_desc)
         sem_tmp.load_data(self.data.d_all)
 
-        return {'mod_init': model_desc}
+        if append:
+            self.mods['mod_init'] = model_desc
+        else:
+            self.mods = {'mod_init': model_desc}
+
 
 
     def set_lat_struct(self, lat_struct_type=None):
@@ -342,7 +457,9 @@ class mtmlModel:
         """
 
         # correct for first indicators of latent variables ?
-        first_ind = self.relations_prior.loc[self.relations_prior['Std. Err'] == '-', ['lval', 'rval']]
+        first_ind = self.relations_prior.loc[(self.relations_prior['Std. Err'] == '-') &
+                                             (self.relations_prior['Estimate'] == 1),
+                                             ['lval', 'rval']]
         if len(first_ind['rval'].tolist()) != len(first_ind['rval'].unique().tolist()):
             raise ValueError('Something is wrong in the model.....')
 

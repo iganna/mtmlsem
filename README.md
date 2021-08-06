@@ -1,6 +1,6 @@
 # mtmlSEM
 
-Construction and estimation of mtmlSEM models
+Construction and estimation of mtmlSEM models :)
 
 ## Description
 

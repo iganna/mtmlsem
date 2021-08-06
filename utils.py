@@ -159,3 +159,5 @@ def check_names(names):
     for s in names:
         if not s.startswith(tuple(ALPHA)):
             raise ValueError(f'Variable name {s} is not supported')
+        if ':' in s:
+            raise ValueError(f'Symbol ":" is not allowed in names of snps/phenotypes')
