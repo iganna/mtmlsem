@@ -504,6 +504,18 @@ class mtmlModel:
             print(f'# Model {k}')
             show(mod)
         print('=============================')
+    
+    def stsl_gwas(self):
+        """
+        Georgy
+        """
+        pass
+    
+    def mtsl_gwas(self):
+        """
+        Georgy
+        """
+        pass
 
 
 
