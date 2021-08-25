@@ -317,6 +317,7 @@ def get_structure_picea(data: Data,
 def get_structure_optics(data_phens):
     """
     Get latent structure with opticks
+    Georgy
     :return:
     """
 
