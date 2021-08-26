@@ -175,7 +175,6 @@ class mtmlModel:
             self.cv_data = CVset(dataset=self.data, n_cv=n_cv)
 
 
-
         thresh_mlr_var = [0.1, 0.01]
         thresh_sign_snp_var = [0.05, 0.01]
         thresh_abs_param_var = [0.1]
@@ -206,56 +205,7 @@ class mtmlModel:
         thresh_sign_snp_var = [0.05, 0.01, 0.001, 0.0001]
         thresh_abs_param_var = [0.1, 0.01]
 
-
-
-
-        res = []
-        for thresh_mlr, thresh_sign_snp, thresh_abs_param in \
-                product(*[thresh_mlr_var,
-                          thresh_sign_snp_var,
-                          thresh_abs_param_var]):
-
-            # print(thresh_mlr, thresh_sign_snp, thresh_abs_param)
-
-            snp_list_cv = []
-            for i_cv in range(n_cv):
-                snp_list = dict()
-                for k_mod, gwas in gwas_cv[i_cv].items():  # keys are models
-                    # Zero means that one 1 SNPs was added
-                    for k_var, tmp in gwas.items():  # keys are names of
-                        snp_list[f'{k_mod}_{k_var}'] = \
-                            [snp for snp, fit_delta, param_val, pval in tmp[0]
-                             if fit_delta > thresh_mlr and
-                             param_val > thresh_abs_param and
-                             pval < thresh_sign_snp]
-                snp_list_cv += [snp_list]
-
-            jacc = []
-            n_list = []
-            for k in snp_list_cv[0].keys():
-                jacc_k = []
-                for i_cv, j_cv in combinations(range(n_cv), 2):
-                    jac_tmp = jaccard(snp_list_cv[i_cv][k], snp_list_cv[j_cv][k])
-                    jacc += [jac_tmp]
-                    n_list += [len(snp_list_cv[i_cv][k]), len(snp_list_cv[j_cv][k])]
-                    jacc_k += [jac_tmp]
-                # print(k, np.mean(jacc_k))
-
-            jacc_mean = np.mean(jacc)
-            # jacc_mean = np.quantile(jacc, 0.25)
-
-            print(thresh_mlr, thresh_sign_snp, thresh_abs_param, jacc_mean, np.mean(n_list))
-            res += [[thresh_mlr, thresh_sign_snp, thresh_abs_param, jacc_mean, np.mean(n_list)]]
-
-
-        jacc_max = 0
-        i_max = -1
-        for i in range(len(res)):
-            if res[i][3] > jacc_max:
-                i_max = i
-                jacc_max = res[i][3]
-
-        res[i_max]
+        pass
 
 
 
@@ -303,8 +253,8 @@ class mtmlModel:
             sem.fit(self.data.d_all)
             relations_prior = sem.inspect()
             relations_prior = relations_prior.loc[relations_prior['op'] == '~',:]
-            self.relations_prior = pd.concat([self.relations_prior,
-                                              relations_prior], axis=0)
+            # TODO: self.relations_prior as dictionary fo several models
+            self.relations_prior = relations_prior
             # print(relations_prior.loc[:, ['lval', 'op', 'rval', 'Estimate']])
             opt = OptBayes(relations=relations_prior, data=self.data,
                            random_effects=self.random_effects)
@@ -504,6 +454,30 @@ class mtmlModel:
             print(f'# Model {k}')
             show(mod)
         print('=============================')
+
+
+    def predict(self, data_test:Data):
+        # self.unnormalize_params()
+
+        # self.relations = self.relations_prior
+
+        mod_unnorm = '\n'.join([f'{v1} ~ {val}*{v2}' for v1, v2, val in zip(self.relations['lval'],
+                               self.relations['rval'],
+                               self.relations['Estimate'])])
+
+        mod_unnorm += '\n' + '\n'.join([f'latent: {f}' for f in self.relations['lval'].unique()
+                                 if f in self.relations['rval'].tolist()])
+        show(mod_unnorm)
+        sem = semopyModel(mod_unnorm)
+        sem.fit(self.data.d_all)
+        preds = sem.predict(data_test.d_snps)
+        preds = preds.loc[:, self.data.phens]
+
+        preds = preds.divide(1 / self.data.s_phens, axis='columns')
+        preds = preds.add(self.data.m_phens, axis='columns')
+
+        return preds
+
     
     def stsl_gwas(self):
         """
