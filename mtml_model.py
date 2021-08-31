@@ -339,7 +339,7 @@ class mtmlModel:
             return dict()
 
         if model_sem is not None:
-            model_desc = model_sem.description
+            model_desc = model_sem.description5
 
         if model_file is not None:
             check_file(model_file)
@@ -490,6 +490,3 @@ class mtmlModel:
         Georgy
         """
         pass
-
-
-
