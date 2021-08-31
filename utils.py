@@ -213,6 +213,9 @@ def translate_names(names: list[str]):
     """
     if type(names) is str:
         names = [names]
+        single = True
+    else:
+        single = False
     chrs = list()
     pos = list()
     for name in names:
@@ -231,4 +234,6 @@ def translate_names(names: list[str]):
         chrs.append(c)
         pos.append(p)
     chrs = translate_chr(chrs)
+    if single:
+        return chrs[0], pos[0]
     return chrs, pos
