@@ -3,6 +3,7 @@ Main class with a model
 """
 
 from semopy import Model as semopyModel
+from gwas_mtsl import gwas_w
 
 from add_snps import *
 from dataset import *
@@ -479,14 +480,53 @@ class mtmlModel:
         return preds
 
     
-    def stsl_gwas(self):
+    def stsl_gwas(self, num_processes=-1, chunk_size=1000, verbose=True):
         """
-        Georgy
+        Single-trait single locus GWAS via linear (optionally mixed) model.
+
+        Note that this is not MTMLSEM, but a regular GWAS via LMM.
+        Parameters
+        ----------
+        num_processes : int, optional
+            Number of processes to run. If -1, then it is selected to number of
+            avaialable CPU cores minus 1. "None" is the same as 1. The default is
+            -1.
+        chunk_size : int, optional
+            Number of SNPs to be sent onto a single process. The default is 1000.
+        verbose : bool, optional
+            If False, then no progress bar will be printed. The default is True.
+
+        Returns
+        -------
+        pd.DataFrame
+            GWAS result that can be further passed to manhattan_plot, for
+            example.
+
         """
-        pass
+    pass
+        
     
-    def mtsl_gwas(self):
+    def mtsl_gwas(self, num_processes=-1, chunk_size=1000, verbose=True):
         """
-        Georgy
+        Single-trait single locus GWAS via linear (optionally mixed) model.
+
+        Note that this is not MTMLSEM, but a regular GWAS via LMM.
+        Parameters
+        ----------
+        num_processes : int, optional
+            Number of processes to run. If -1, then it is selected to number of
+            avaialable CPU cores minus 1. "None" is the same as 1. The default is
+            -1.
+        chunk_size : int, optional
+            Number of SNPs to be sent onto a single process. The default is 1000.
+        verbose : bool, optional
+            If False, then no progress bar will be printed. The default is True.
+
+        Returns
+        -------
+        pd.DataFrame
+            GWAS result that can be further passed to manhattan_plot, for
+            example.
+
         """
         pass

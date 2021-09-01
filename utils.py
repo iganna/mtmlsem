@@ -11,6 +11,7 @@ import os
 import re
 import string
 import numpy as np
+import pandas as pd
 
 def create_path(path_tmp):
     """
@@ -237,3 +238,47 @@ def translate_names(names: list[str]):
     if single:
         return chrs[0], pos[0]
     return chrs, pos
+
+
+def unique_mapping(x):
+    """
+    Retrieve a mapping of unique columns to duplicates.
+
+    Parameters
+    ----------
+    x : np.ndarray or pd.DataFrame
+        Pandas DataFrame or numpy two-dimensional array.
+
+    Returns
+    -------
+    uniques : dict
+        Mapping of unique columns to its duplicates. The first occurence of 
+        the column is considered to be "unique".
+    """
+    
+    if type(x) is pd.DataFrame:
+        cols = x.columns
+        x = x.values
+    else:
+        cols = None
+    s = x.mean(axis=0)
+    med = np.median(x, axis=0)
+    d = dict()
+    uniques = dict()
+    for i in range(x.shape[1]):
+        tx = x[:, i]
+        k = (s[i], med[i])
+        if k not in d:
+            d[k] = [i]
+            uniques[i] = list()
+        else:
+            lt = d[k]
+            try:
+                j = next(filter(lambda y: np.all(x[:, y] == tx), lt))
+                uniques[j].append(i)
+            except StopIteration:
+                d[k].append(i)
+                uniques[i] = list()
+    if cols is not None:
+        uniques = {cols[i]: [cols[j] for j in lt] for i, lt in uniques.items()}
+    return uniques

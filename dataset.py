@@ -225,7 +225,7 @@ class Data:
         for ptype, phens in self.d_phen_types.items():
             if ptype != PhenType.ord:
                 non_ordinal.update(phens)
-        non_ordinal = tuple(non_ordinal)
+        non_ordinal = list(non_ordinal)
         if m is None:
             m = self.d_phens[non_ordinal].mean()
 
