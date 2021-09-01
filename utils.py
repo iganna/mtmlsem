@@ -11,6 +11,7 @@ import os
 import re
 import string
 import numpy as np
+import pandas as pd
 
 def create_path(path_tmp):
     """
@@ -160,4 +161,126 @@ def check_names(names):
         if not s.startswith(tuple(ALPHA)):
             raise ValueError(f'Variable name {s} is not supported')
         if ':' in s:
-            raise ValueError(f'Symbol ":" is not allowed in names of snps/phenotypes')
+            raise ValueError('Symbol ":" is not allowed in names of snps/phenotypes')
+
+
+def translate_chr(names: list[str]):
+    """
+    Translate chr names into chromosome numbers.
+
+    Parameters
+    ----------
+    names : list[str]
+        List of chromosomal names.
+
+    Returns
+    -------
+    List[int] of chromosome numbers.
+
+    """
+    if type(names) is str:
+        names = [names]
+    ptrn = re.compile(r'\w+?(\d+)(?:\.\d+)?\s*$')
+    min_chr = float('inf')
+    chrs = [0] * len(names)
+    for i, name in enumerate(names):
+        try:
+            c = int(name)
+        except ValueError:
+            c = ptrn.findall(name)
+            if not c:
+                raise NameError(f"Incorrect chromosomal name: {name}. "
+                                "It should be either integer or be similar to "
+                                "'CP027633.1'.")
+        if c < min_chr:
+            min_chr = c
+        chrs[i] = c
+    for i in range(len(chrs)):
+        chrs[i] -= min_chr - 1
+    return chrs
+        
+    
+def translate_names(names: list[str]):
+    """
+    Translate snp names into pairs of chromosome numbers and positions.
+
+    Parameters
+    ----------
+    names : list[str]
+        List of snp names.
+
+    Returns
+    -------
+    List[int] of chromosome numbers.
+
+    """
+    if type(names) is str:
+        names = [names]
+        single = True
+    else:
+        single = False
+    chrs = list()
+    pos = list()
+    for name in names:
+        t = name.split('_')
+        if len(t) < 2:
+            t = name.split(':')
+        if len(t) < 2:
+            t = name.split('.')
+        if len(t) < 2:
+            raise NameError(f"Incorrect SNP name: {name}.")
+        c = '_'.join(t[:-1])
+        try:
+            p = int(t[-1])
+        except ValueError:
+            raise NameError(f"Can't parse SNP position in {name}.")
+        chrs.append(c)
+        pos.append(p)
+    chrs = translate_chr(chrs)
+    if single:
+        return chrs[0], pos[0]
+    return chrs, pos
+
+
+def unique_mapping(x):
+    """
+    Retrieve a mapping of unique columns to duplicates.
+
+    Parameters
+    ----------
+    x : np.ndarray or pd.DataFrame
+        Pandas DataFrame or numpy two-dimensional array.
+
+    Returns
+    -------
+    uniques : dict
+        Mapping of unique columns to its duplicates. The first occurence of 
+        the column is considered to be "unique".
+    """
+    
+    if type(x) is pd.DataFrame:
+        cols = x.columns
+        x = x.values
+    else:
+        cols = None
+    s = x.mean(axis=0)
+    med = np.median(x, axis=0)
+    d = dict()
+    uniques = dict()
+    for i in range(x.shape[1]):
+        tx = x[:, i]
+        k = (s[i], med[i])
+        if k not in d:
+            d[k] = [i]
+            uniques[i] = list()
+        else:
+            lt = d[k]
+            try:
+                j = next(filter(lambda y: np.all(x[:, y] == tx), lt))
+                uniques[j].append(i)
+            except StopIteration:
+                d[k].append(i)
+                uniques[i] = list()
+    if cols is not None:
+        uniques = {cols[i]: [cols[j] for j in lt] for i, lt in uniques.items()}
+    return uniques

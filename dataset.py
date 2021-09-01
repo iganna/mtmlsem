@@ -7,19 +7,17 @@ Module to work with the data and to create cross-validation set
 # TODO: add epistatic SNPs
 #
 
-import copy
 import warnings
 import numpy as np
 from pandas import read_csv, DataFrame, concat, Series
-from semopy.utils import calc_reduced_ml
-
-
+from scipy.linalg.blas import get_blas_funcs
+from sklearn.impute import KNNImputer
 from math import ceil
-
-
 from utils import *
+from enum import Enum
 
-class PhenType:
+
+class PhenType(Enum):
     """
     Different types of variables
     """
@@ -218,42 +216,77 @@ class Data:
         #     pass
 
 
-        # TODO do not normalise ordinal variables
+        non_ordinal = set()
+        for ptype, phens in self.d_phen_types.items():
+            if ptype != PhenType.ord:
+                non_ordinal.update(phens)
+        non_ordinal = list(non_ordinal)
         if m is None:
-            m = self.d_phens.mean()
-            # m[[tmp not in self.d_phen_types[PhenType.norm] for tmp in m.index]] = 0
+            m = self.d_phens[non_ordinal].mean()
 
         if s is None:
-            s = self.d_phens.std()
-            # s[[tmp not in self.d_phen_types[PhenType.norm] for tmp in s.index]] = 1
+            s = self.d_phens[non_ordinal].std()
 
         if not std_flag:
             m = m * 0
             s = s * 0 + 1
 
-        # m[3] = 0
-        # s[3] = 1
-
 
         self.m_phens = m
         self.s_phens = s
 
-        self.d_phens = self.d_phens.add(-m, axis='columns')
-        self.d_phens = self.d_phens.divide(s, axis='columns')
+        self.d_phens[non_ordinal] -= m
+        self.d_phens[non_ordinal] /= s
 
         return m, s
 
-    def estim_kinship(self):
+    def estim_kinship(self, std=True, chunk_size=2048):
         """
-        Estimate Kinship as in rrBLUP - Georgy
-        :return: kinship
+        Estimate kinship.
+
+        Parameters
+        ----------
+        std : bool, optional
+            If True, then standardized K is estimated. The default is True.
+        chunk_size : TYPE, optional
+             Size of chunk used to compute K. The default is 2048.
+
+        Raises
+        ------
+        ValueError
+            When no SNPs present to compute kinship.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
         """
-        # TODO: Georgy?
-        # return np.identity(self.n_samples)
         if len(self.d_snps.columns) < 2:
             raise ValueError('Kinship matrix cannot be calculated')
-        return self.d_snps.transpose().cov().to_numpy()
-
+        markers = np.array(self.d_snps)
+        n, p = markers.shape
+        out = np.zeros((n, n), order="F")
+        gemm = get_blas_funcs("gemm", [out])
+    
+        start = 0
+        while start < p:
+            end = start + chunk_size
+            g = markers[:, start:end]
+            m = np.nanmean(g, 0)
+            g = np.where(np.isnan(g), m, g)
+            g = g - m
+            if std:
+                g /= np.std(g, 0)
+            g /= np.sqrt(p)
+            gemm(1.0, g, g, 1.0, out, 0, 1, 1)
+            start = end
+        try:
+            c = self.d_snps.index
+            return DataFrame(out, columns=c, index=c)
+        except AttributeError:
+            pass
+        return out
 
     # ---------------------------------------------
     # Set functions with checks
@@ -354,95 +387,84 @@ class Data:
         return self.d_phen_types
 
 
-    def impute_snps(self, kiship_cutoff=0.8):
+    def impute_snps(self):
         """
-        Imputation of SNPs as in rrBLUP
-        Together with imputation we have to remember positions of SNPs,
-        that were imputed and have a function "miss SNPs" to return everything back
-        :return:
-        """
-        # TODO: Georgy?
-        # To remember SNP positions, the were imputed?
-        self.snps_miss = np.where(self.d_snps.isna())
+        Imputation of SNPs using KNN algorithm.
+        
+        Note that this is more of "better than nothing" approach. We advise to
+        use special software like BEAGLE or IMPUTE2 for smart SNP imputation
+        instead if possible.
+        Raises
+        ------
+        ValueError
+            When some SNP value failed to be imputed.
 
-        if len(self.snps_miss[0]) == 0:
+        Returns
+        -------
+        None.
+
+        """
+        self.snps_miss = self.d_snps.isna()
+        if self.snps_miss.sum().sum() == 0:
             return
-        # TODO: change to real kinship?
-
-        while True:
-            kinship = self.d_snps.transpose().corr()
-            kinship[kinship < kiship_cutoff] = 0
-            # Set diagonal elements to 0
-            kinship.values[[np.arange(kinship.shape[0])] * 2] = 0
-
-            # To make the sum of each row queal to 1
-            kinship = kinship.div(kinship.sum(), axis=0)
-
-            if kinship.isna().sum().sum() == 0:
-                break
-            else:
-                kiship_cutoff *= 0.9
-
-        self.d_snps[self.d_snps.isna()] = 0
-        tmp = kinship @ self.d_snps
-
-        for i, j in zip(*self.snps_miss):
-            self.d_snps.iloc[i, j] = tmp.iloc[i, j]
+        snps = self.d_snps
+        x = KNNImputer(n_neighbors=10, weights='distance').fit_transform(snps)
+        self.d_snps = DataFrame(x, index=snps.index, columns=snps.columns)
 
         if self.d_snps.isna().sum().sum() != 0:
-            raise ValueError('Imputation was broken')
+            raise ValueError('Imputation is broken.')
 
 
 
     def miss_snps(self):
         """
-        Return SNP matrix to its initial state with missing data
-        :return:
+        Return SNP matrix to its initial state with missing data.
+
+        Returns
+        -------
+        None.
+
         """
-        # TODO: Georgy?
-        pass
+        self.d_snps[self.snps_miss] = float('nan')
 
 
-    def impute_phens(self, kiship_cutoff=0.8):
+    def impute_phens(self):
         """
-        Impute phenotypes
-        :return:
-        """
-        # TODO: Georgy?
+        Impute phenotypes using distance-weighted KNN algorithm.
 
+        Returns
+        -------
+        None.
+
+        """
         self.phens_miss = np.where(self.d_phens.isna())
         if len(self.phens_miss[0]) == 0:
             return
-
-        # TODO: change to real kinship?
-        while True:
-            kinship = self.d_snps.transpose().corr()
-            kinship[kinship < kiship_cutoff] = 0
-            # Set diagonal elements to 0
-            kinship.values[[np.arange(kinship.shape[0])] * 2] = 0
-
-            # To make the sum of each row queal to 1
-            kinship = kinship.div(kinship.sum(), axis=0)
-
-            if kinship.isna().sum().sum() == 0:
-                break
-            else:
-                kiship_cutoff *= 0.9
-
-        self.d_phens[self.d_phens.isna()] = 0
-        tmp = kinship @ self.d_phens
-
-        for i, j in zip(*self.phens_miss):
-            self.d_phens.iloc[i, j] = tmp.iloc[i, j]
+        phens = self.d_phens
+        cols = list()
+        for col, c in phens.iteritems():
+            try:
+                c.values.astype(float)
+                cols.append(col)
+            except ValueError:
+                pass
+        x = KNNImputer(n_neighbors=3,
+                       weights='distance').fit_transform(phens[cols])
+        for i, c in enumerate(cols):
+            phens[c] = x[:, i]
+        self.d_phens = DataFrame(x, index=phens.index, columns=phens.columns)
 
 
     def miss_phens(self, phens_to_miss=None):
         """
-        Return phenotype
-        :return:
+        Return phenotypes dataframe to its initial state with missing values.
+
+        Returns
+        -------
+        None.
+
         """
-        # TODO: Georgy?
-        pass
+        self.d_phens[self.phens_miss] = float('nan')
 
 
     def generate_epistasis(self, snps_to_epi=None):
@@ -580,6 +602,3 @@ class REff:
                              f'is not symmetric')
 
         return reff
-
-
-

@@ -121,29 +121,29 @@ model.opt_bayes()
 
 
 
-import semopy
-import semopy.model_generation as modgen
-import numpy as np
-import random
-random.seed(1)
-np.random.seed(1)
+# import semopy
+# import semopy.model_generation as modgen
+# import numpy as np
+# import random
+# random.seed(1)
+# np.random.seed(1)
 
-desc = modgen.generate_desc(0, 0, 2, 3)
-params, aux = modgen.generate_parameters(desc)
-data = modgen.generate_data(aux, 500)
+# desc = modgen.generate_desc(0, 0, 2, 3)
+# params, aux = modgen.generate_parameters(desc)
+# data = modgen.generate_data(aux, 500)
 
-lt = set(data.columns)
-for n in range(1, 21):
-    data[f'g{n}'] = np.random.normal(size=len(data))
-lfs = list()
-desc = desc.split('# S')[0]
-for i in range(0, 21):
-    if i:
-        desc += f'\neta1 ~ g{i}'
-    m = semopy.Model(desc, cov_diag=True)
-    r = m.fit(data)
-    lf = semopy.utils.calc_reduced_ml(m, lt) - lf[0]
-    lfs.append(lf)
+# lt = set(data.columns)
+# for n in range(1, 21):
+#     data[f'g{n}'] = np.random.normal(size=len(data))
+# lfs = list()
+# desc = desc.split('# S')[0]
+# for i in range(0, 21):
+#     if i:
+#         desc += f'\neta1 ~ g{i}'
+#     m = semopy.Model(desc, cov_diag=True)
+#     r = m.fit(data)
+#     lf = semopy.utils.calc_reduced_ml(m, lt) - lf[0]
+#     lfs.append(lf)
 
-print(lfs)
-print(-np.log(lfs))
+# print(lfs)
+# print(-np.log(lfs))

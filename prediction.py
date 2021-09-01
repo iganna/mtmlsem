@@ -1,3 +1,0 @@
-"""
-Predict sphenotypes by SNPs
-"""

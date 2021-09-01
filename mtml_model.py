@@ -3,6 +3,8 @@ Main class with a model
 """
 
 from semopy import Model as semopyModel
+from gwas_mtsl import gwas
+
 
 from add_snps import *
 from dataset import *
@@ -347,8 +349,6 @@ class mtmlModel:
                 model_desc = f.read()
                 show(model_desc)
 
-        # Check correspondence between data and model
-        # TODO: Georgy/Anna
         sem_tmp = semopyModel(model_desc)
         sem_tmp.load_data(self.data.d_all)
 
@@ -479,17 +479,88 @@ class mtmlModel:
         return preds
 
     
-    def stsl_gwas(self):
+    def stsl_gwas(self, phenos=None, num_processes=-1, chunk_size=1000,
+                  verbose=True):
+        
         """
-        Georgy
+        Single-trait single locus GWAS via linear (optionally mixed) model.
+
+        Note that this is not MTMLSEM, but a regular GWAS via LMM.
+        Parameters
+        ----------
+        phenos : list[str], optional
+            List of phenotypes to run STSL against. If None, then all model
+            phenotypes are used. The default is None.
+        num_processes : int, optional
+            Number of processes to run. If -1, then it is selected to number of
+            avaialable CPU cores minus 1. "None" is the same as 1. The default
+            is -1.
+        chunk_size : int, optional
+            Number of SNPs to be sent onto a single process. The default is
+            1000.
+        verbose : bool, optional
+            If False, then no progress bar will be printed. The default is
+            True.
+
+        Yields
+        -------
+        str
+            Name of phenotype.
+        pd.DataFrame
+            GWAS result that can be further passed to manhattan_plot, for
+            example.
+
         """
-        pass
+        if phenos is None:
+            phenos = set()
+            for k, lt in self.data.d_phen_types.iteritems():
+                if k != PhenType.ordinal:
+                    phenos.update(lt)
+        d_phens = self.data.d_phens
+        d_snps = self.data.d_snps
+        for pheno in phenos:
+            yield pheno, gwas(semopyModel, pheno, d_phens, d_snps,
+                              desc=str(), init_args=dict(), fit_args=dict(),
+                              num_processes=num_processes, chunk_size=chunk_size,
+                              verbose=verbose)
+        
     
-    def mtsl_gwas(self):
+    def mtsl_gwas(self, phenos=None, num_processes=-1, chunk_size=1000,
+                  verbose=True):
         """
-        Georgy
+        Single-trait single locus GWAS via linear (optionally mixed) model.
+
+        Note that this is not MTMLSEM, but a regular GWAS via LMM.
+        Parameters
+        ----------
+        phenos : list[str], optional
+            List of phenotype sets to run MTSL against. If None, then all model
+            phenotypes are used. The default is None.
+        num_processes : int, optional
+            Number of processes to run. If -1, then it is selected to number of
+            avaialable CPU cores minus 1. "None" is the same as 1. The default is
+            -1.
+        chunk_size : int, optional
+            Number of SNPs to be sent onto a single process. The default is 1000.
+        verbose : bool, optional
+            If False, then no progress bar will be printed. The default is True.
+
+        Returns
+        -------
+        pd.DataFrame
+            GWAS result that can be further passed to manhattan_plot, for
+            example.
+
         """
-        pass
-
-
-
+        if phenos is None:
+            phenos = set()
+            for k, lt in self.data.d_phen_types.iteritems():
+                if k != PhenType.ordinal:
+                    phenos.update(lt)
+            phenos = list(phenos)
+        d_phens = self.data.d_phens
+        d_snps = self.data.d_snps
+        return gwas(semopyModel, [phenos], d_phens, d_snps,
+                    desc=str(), init_args=dict(), fit_args=dict(),
+                    num_processes=num_processes, chunk_size=chunk_size,
+                    verbose=verbose)
