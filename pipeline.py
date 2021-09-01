@@ -81,6 +81,10 @@ model.show_mod()
 self = model
 n_cv = 4
 
+# it = model.stsl_gwas()
+# for a, b in it:
+#     print(a)
+#     print(b.head())
 
 # model.add_snps(snp_pref=snp_pref)
 
@@ -100,7 +104,7 @@ mod = model.mods['mod0']
 # model.show_mod()
 
 
-model.opt_bayes()
+# model.opt_bayes()
 
 #
 # descr = """ FC1 ~ FC2

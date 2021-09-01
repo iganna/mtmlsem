@@ -88,16 +88,16 @@ def gwas_lmm(Model, y: list[str], phenos, genes, desc='', init_args=None,
                 pvals.append(row['p-value'])
                 ests.append(row['Estimate'])
             res.append([name, chr, pos, fun] + pvals + ests)
-    cols = ['SNP', 'chr', 'pos'] + [f'{p}_p-value' for p in y] + [f'{p}_b'
-                                                                  for p in y]
+    cols = ['SNP', 'chr', 'pos', 'lf'] + [f'{p}_p-value' for p in y] +\
+           [f'{p}_b' for p in y]
     return pd.DataFrame(res, columns=cols)
 
 
 def gwas_w(lt):
     gs, lt = lt
     mod, y, phenos, genes, desc, init_args, fit_args = lt
-    return gwas(mod, y, phenos, genes[gs], desc, init_args, fit_args,
-                verbose=False)
+    return gwas_lmm(mod, y, phenos, genes[gs], desc, init_args, fit_args,
+                    verbose=False)
 
 def gwas(Model, y: list[str], phenos, genes, desc='', init_args=None, 
          fit_args=None, num_processes=-1, chunk_size=1000, verbose=True):
@@ -136,9 +136,9 @@ def gwas(Model, y: list[str], phenos, genes, desc='', init_args=None,
         GWAS results.
 
     """
-    
     from multiprocessing import Pool, cpu_count
-    from tqdm.contrib.concurrent import process_map
+    from tqdm import tqdm
+
     if type(y) is str:
         y = [y]
     if num_processes == -1:
@@ -152,23 +152,15 @@ def gwas(Model, y: list[str], phenos, genes, desc='', init_args=None,
 
     result = None
     lt = list(genes.columns)
+    chunk_size = min(chunk_size, len(lt) // num_processes )
     lt2 = [lt[i:i+chunk_size] for i in range(0, len(lt), chunk_size)]
-    lt = (Model, y, phenos, genes, desc, init_args, fit_args)
+    lt = [(Model, y, phenos, genes, desc, init_args, fit_args)]
     prod = product(lt2, lt)
-    n = 1
-    if not verbose:
-        with Pool(num_processes) as p:
-            for t in p.map(gwas_w, prod):
-                t.index = list(range(n, n + len(t)))
-                n += len(t)
-                if result is None:
-                    result = t
-                else:
-                    result = pd.concat([result, t])
-    else:
-        for t in process_map(gwas_w, list(prod)):
-            t.index = list(range(n, n + len(t)))
-            n += len(t)
+    with Pool(num_processes) as p:
+        it = p.imap(gwas_w, prod)
+        if verbose:
+            it = tqdm(it, total=len(lt2))
+        for t in it:
             if result is None:
                 result = t
             else:
@@ -183,5 +175,7 @@ def gwas(Model, y: list[str], phenos, genes, desc='', init_args=None,
             dups.append(row)
     for dup in dups:
         result = result.append(dup)       
-    return result.sort_values(['chr', 'pos'])
+    result = result.sort_values(['chr', 'pos'])
+    result.index = list(range(1, len(result) + 1))
+    return result
             

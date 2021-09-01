@@ -513,8 +513,8 @@ class mtmlModel:
         """
         if phenos is None:
             phenos = set()
-            for k, lt in self.data.d_phen_types.iteritems():
-                if k != PhenType.ordinal:
+            for k, lt in self.data.d_phen_types.items():
+                if k != PhenType.ord:
                     phenos.update(lt)
         d_phens = self.data.d_phens
         d_snps = self.data.d_snps
@@ -554,13 +554,13 @@ class mtmlModel:
         """
         if phenos is None:
             phenos = set()
-            for k, lt in self.data.d_phen_types.iteritems():
-                if k != PhenType.ordinal:
+            for k, lt in self.data.d_phen_types.items():
+                if k != PhenType.ord:
                     phenos.update(lt)
             phenos = list(phenos)
         d_phens = self.data.d_phens
         d_snps = self.data.d_snps
-        return gwas(semopyModel, [phenos], d_phens, d_snps,
+        return gwas(semopyModel, phenos, d_phens, d_snps,
                     desc=str(), init_args=dict(), fit_args=dict(),
                     num_processes=num_processes, chunk_size=chunk_size,
                     verbose=verbose)

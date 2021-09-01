@@ -192,6 +192,7 @@ def translate_chr(names: list[str]):
                 raise NameError(f"Incorrect chromosomal name: {name}. "
                                 "It should be either integer or be similar to "
                                 "'CP027633.1'.")
+            c = int(c[-1])
         if c < min_chr:
             min_chr = c
         chrs[i] = c

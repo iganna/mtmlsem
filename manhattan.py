@@ -29,7 +29,8 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
     alpha : float, optional
         P-value cutoff value. The default is 0.05.
     mp_test : str, optional
-        Name of multipletest method. The default is 'fdr_bh'.
+        Name of multipletest method. If None, then exactly alpha is used. The
+        default is 'fdr_bh'.
     label_snps : bool, optional
         If True, the labels for selected SNPs are shown. The default is True.
     clipping : float, optional
@@ -50,17 +51,18 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
     if type(tests) is str:
         tests = dt.fread(tests).to_pandas()
     tests = tests.sort_values(['chr', 'pos'])
-    pvals = tests[f'{name}_p-value']
-    mp = multipletests(pvals, alpha, mp_test)
-    for n in range(len(mp[0])):
+    pvals = sorted(tests[f'{name}_p-value'])
+    if mp_test:
+        mp = multipletests(pvals, alpha, mp_test)[0]
+        for n in range(len(mp)):
+            if mp[n]:
+                break
         if mp[n]:
-            break
-    if mp[n]:
-        alpha = pvals[n] - (pvals[n] - pvals[n - 1]) / 2
-    else:
-        alpha = float('inf')
-
-    pvals = -np.log(pvals) / np.log(10)
+            alpha = pvals[n] - (pvals[n] - pvals[n - 1]) / 2
+        else:
+            alpha = float('inf')
+    alpha = -np.log(alpha) / np.log(10)
+    pvals = -np.log(tests[f'{name}_p-value']) / np.log(10)
     if clipping is not None:
         pvals = np.clip(pvals, 0, clipping)
     first_chr = tests['chr'].iloc[0]
@@ -80,7 +82,7 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
         y = pvals[a:b]
         ps = pos[a:b]
         for i, pval in enumerate(y):
-            if pval >= alpha:
+            if label_snps and pval >= alpha:
                 name = f'{c}_{ps[i]}'
                 txt = plt.text(x[i], pval + np.random.random() / 50, name,
                                 fontsize="xx-small")
@@ -92,11 +94,14 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
             if t in tmp:
                 plt.plot(i + shift, pvals[i], 'kx')
         shift += chr_shift
-    adjust_text(texts, 
-                autoalign='y', ha='left',
-                only_move={'text':'y'},
-                force_text=(0,0.7),
-                arrowprops=dict(arrowstyle="-",color='k', lw=0.5, alpha=0.6))
+    if label_snps:
+        adjust_text(texts, 
+                    autoalign='y', ha='left',
+                    lim=250,
+                    only_move={'text':'y'},
+                    force_text=(0,0.7),
+                    arrowprops=dict(arrowstyle="-",color='k', lw=0.5,
+                                    alpha=0.6))
     plt.plot([0, i + shift], [alpha, alpha], 'k--')
     if clipping is not None:
         plt.ylim([0, clipping])
@@ -104,10 +109,10 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
     plt.margins(x=0, y=0)
     plt.xlabel('chromosome')
     plt.ylabel('-log10(p-value)')
-    t = pval > alpha
+    t = pvals > alpha
     if show_num_accepts:
         c = sum(t)
         plt.title(name + f' [{c}]')
     else:
         plt.title(name)
-    return tests.loc[t]
+    return tests.iloc[np.where(t)[0]]
