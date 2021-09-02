@@ -13,7 +13,7 @@ from itertools import combinations, product
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-from utils import translate_names, unique_mapping
+from .utils import translate_names, unique_mapping
 
 
 def gwas_lmm(Model, y: list[str], phenos, genes, desc='', init_args=None,

@@ -1,12 +1,11 @@
 
 import os
-from mtml_model import mtmlModel
-from dataset import Data, CVset
+from mtmlsem import mtmlModel
+from mtmlsem import Data, CVset
 from pandas import read_csv
-from optimisation import *
 from semopy.efa import explore_cfa_model
-from utils import *
-
+# from utils import *
+#
 # path_data = 'data_cicer/'
 # file_phens = path_data + 'data_phens.txt'
 # file_snps = path_data + 'snp_2579_renamed.txt'
@@ -61,14 +60,14 @@ data_phens = data_phens.loc[:, ['Productivity', 'ilr1', 'ilr2']]
 # ---------------------
 
 
-data_phens = data_phens.loc[data_phens.isna().sum(axis=1) == 0, :]
-data_phens = data_phens.iloc[:, list(data_phens.nunique() > 2)]
-data_snps = read_csv(file_snps, sep='\t', index_col=0)
+# data_phens = data_phens.loc[data_phens.isna().sum(axis=1) == 0, :]
+# data_phens = data_phens.iloc[:, list(data_phens.nunique() > 2)]
+# data_snps = read_csv(file_snps, sep='\t', index_col=0)
 
 
 
 # data = Data(d_snps=data_snps, d_phens=data_phens)
-data = Data(d_snps=file_snps, d_phens=file_phens)
+data = Data(d_snps=file_snps, d_phens=data_phens)
 print(data.n_samples)
 self = data
 

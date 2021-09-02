@@ -12,16 +12,16 @@ import pandas as pd
 from itertools import combinations, permutations
 
 
-from dataset import Data, CVset
+from .dataset import Data, CVset
 
-from utils import showl
+from .utils import showl
 
 # Function for factor analysis
 from factor_analyzer import FactorAnalyzer
 from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity
 from factor_analyzer.factor_analyzer import calculate_kmo
 
-from parallel_analysis import pa
+from .parallel_analysis import pa
 
 
 def get_fa_loads(d_phens,

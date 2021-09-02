@@ -8,9 +8,9 @@ from semopy import Model as semopyModel
 # from semopy import ModelMeans as semopyModel
 from semopy.utils import calc_reduced_ml
 from pandas import DataFrame, concat
-from dataset import Data
+from .dataset import Data
 
-from utils import *
+from .utils import *
 
 from itertools import product
 from factor_analyzer import FactorAnalyzer

@@ -1,12 +1,9 @@
 
 import os
-from mtml_model import mtmlModel
-from dataset import Data, CVset
+from mtmlsem import mtmlModel, Data, CVset
 from pandas import read_csv
-from optimisation import *
 from semopy.efa import explore_cfa_model
-from utils import *
-from add_snps import *
+from mtmlsem.add_snps import *
 
 from multiprocess import Pool
 

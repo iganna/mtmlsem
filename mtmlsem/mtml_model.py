@@ -3,16 +3,15 @@ Main class with a model
 """
 
 from semopy import Model as semopyModel
-from gwas_mtsl import gwas
 
+from .gwas_mtsl import gwas
+from .add_snps import *
+from .dataset import *
+from .lat_struct import *
+from .optimisation import *
+from .offspring import *
 
-from add_snps import *
-from dataset import *
-from lat_struct import *
-from optimisation import *
-from offspring import *
-
-from utils import *
+from .utils import *
 
 from itertools import product, combinations
 

@@ -2,19 +2,19 @@ import os
 import numpy as np
 import pandas as pd
 
-from mtml_model import mtmlModel
-from dataset import Data, CVset
+from .mtml_model import mtmlModel
+from .dataset import Data, CVset
 from pandas import read_csv
-from optimisation import *
+from .optimisation import *
 import semopy
 import semba
 import random
-from utils import *
+from .utils import *
 
 from semopy import Model as semopyModel
-from lat_struct import *
-from optimisation import *
-from utils import *
+from .lat_struct import *
+from .optimisation import *
+from .utils import *
 
 
 

@@ -2,11 +2,6 @@
 This module contains utilities
 """
 
-__author__ = "Anna Igolkina"
-__license__ = "MIT"
-__maintainer__ = "Anna Igolkina"
-__email__ = "igolkinaanna11@gmail.com"
-
 import os
 import re
 import string

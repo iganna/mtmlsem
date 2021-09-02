@@ -90,13 +90,13 @@ def read_tabular(file: str):
     cols[0] = 'indv'
     df.columns = cols
     df = df.set_index(df.columns[0])
-    unqs = np.unique(df)
-    if (np.nan not in unqs) and (unqs.max() > 1) and\
-        np.all((unqs[unqs < 0] == -1)):
-        df = df.replace(-1, float('nan'))
     try:
+        unqs = np.unique(df).astype(float)
+        if (not np.any(np.isnan(unqs))) and (unqs.max() > 1) and\
+            np.all((unqs[unqs < 0] == -1)):
+            df = df.replace(-1, float('nan'))
         return df.astype(float)
-    except ValueError:
+    except (ValueError, TypeError):
         raise ValueError(f"Couldn't convert {file} items to float values."
                          " Make sure that there are no illegal and non-numeric"
                          " characters. SNP tabular should start with a column"

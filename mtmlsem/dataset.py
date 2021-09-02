@@ -9,12 +9,12 @@ Module to work with the data and to create cross-validation set
 
 import warnings
 import numpy as np
-import readers
+from . import readers
 from pandas import read_csv, DataFrame, concat, Series
 from scipy.linalg.blas import get_blas_funcs
 from sklearn.impute import KNNImputer
 from math import ceil
-from utils import *
+from .utils import *
 from enum import Enum
 from typing import Union
 

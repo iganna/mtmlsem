@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats as st
 
 from semopy import Model
-from dataset import *
+from .dataset import *
 
 
 class OptBayes:
