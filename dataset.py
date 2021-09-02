@@ -9,12 +9,14 @@ Module to work with the data and to create cross-validation set
 
 import warnings
 import numpy as np
+import readers
 from pandas import read_csv, DataFrame, concat, Series
 from scipy.linalg.blas import get_blas_funcs
 from sklearn.impute import KNNImputer
 from math import ceil
 from utils import *
 from enum import Enum
+from typing import Union
 
 
 class PhenType(Enum):
@@ -32,8 +34,8 @@ class Data:
     kinship_var_name = 'kinship'
 
     def __init__(self,
-                 d_snps: DataFrame = None,
-                 d_phens: DataFrame = None,
+                 d_snps: Union[DataFrame, str] = None,
+                 d_phens: Union[DataFrame,str] = None,
                  d_phen_types=None,
                  s_reffs=None,
                  cov_reffs=None,
@@ -61,7 +63,15 @@ class Data:
         self.echo = echo
         # --------------------------------------------------
         # Set SNPs and phenotypes (including metadata)
+        if type(d_phens) is str:
+            if echo:
+                print("Reading phenotypes file...")
+            d_phens = readers.read_phenotypes(d_phens)
         self.d_phens = self.set_phens(d_phens=d_phens)
+        if type(d_snps) is str:
+            if echo:
+                print("Reading genotypes file...")
+            d_snps = readers.read_genotypes(d_snps)
         self.d_snps = self.set_snps(d_snps=d_snps)
 
         # Get correspondence between phens and snps:

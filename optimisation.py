@@ -11,7 +11,8 @@ from dataset import *
 
 class OptBayes:
 
-    t_lat, t_obs, t_ord, t_m, t_nan = ['_latent', '_observed', '_ordinal', '_mean', '_nan']
+    t_lat, t_obs, t_ord, t_m, t_nan = ['_latent', '_observed', '_ordinal',
+                                       '_mean', '_nan']
     def __init__(self, relations,
                  data: Data,
                  random_effects=None,

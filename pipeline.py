@@ -67,7 +67,8 @@ data_snps = read_csv(file_snps, sep='\t', index_col=0)
 
 
 
-data = Data(d_snps=data_snps, d_phens=data_phens)
+# data = Data(d_snps=data_snps, d_phens=data_phens)
+data = Data(d_snps=file_snps, d_phens=file_phens)
 print(data.n_samples)
 self = data
 
