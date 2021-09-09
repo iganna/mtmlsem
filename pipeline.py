@@ -81,7 +81,7 @@ model.show_mod()
 self = model
 n_cv = 4
 
-# it = model.stsl_gwas()
+it = model.stsl_gwas()
 # for a, b in it:
 #     print(a)
 #     print(b.head())

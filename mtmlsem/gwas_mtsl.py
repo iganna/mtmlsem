@@ -178,4 +178,3 @@ def gwas(Model, y: list[str], phenos, genes, desc='', init_args=None,
     result = result.sort_values(['chr', 'pos'])
     result.index = list(range(1, len(result) + 1))
     return result
-            

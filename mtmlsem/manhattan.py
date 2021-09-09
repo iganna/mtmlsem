@@ -51,7 +51,7 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
     if type(tests) is str:
         tests = dt.fread(tests).to_pandas()
     tests = tests.sort_values(['chr', 'pos'])
-    pvals = sorted(tests[f'{name}_p-value'])
+    pvals = sorted(tests[f'{name}_p-value'])[::-1]
     if mp_test:
         mp = multipletests(pvals, alpha, mp_test)[0]
         for n in range(len(mp)):
@@ -102,7 +102,8 @@ def manhattan(tests, name: str, alpha=0.05, mp_test='fdr_bh',
                     force_text=(0,0.7),
                     arrowprops=dict(arrowstyle="-",color='k', lw=0.5,
                                     alpha=0.6))
-    plt.plot([0, i + shift], [alpha, alpha], 'k--')
+    if np.isfinite(alpha):
+        plt.plot([0, i + shift], [alpha, alpha], 'k--')
     if clipping is not None:
         plt.ylim([0, clipping])
     plt.xticks(ticks, list(range(first_chr, last_chr + 1)))
