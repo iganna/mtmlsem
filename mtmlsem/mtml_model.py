@@ -520,7 +520,8 @@ class mtmlModel:
         for pheno in phenos:
             yield pheno, gwas(semopyModel, pheno, d_phens, d_snps,
                               desc=str(), init_args=dict(), fit_args=dict(),
-                              num_processes=num_processes, chunk_size=chunk_size,
+                              num_processes=num_processes,
+                              chunk_size=chunk_size,
                               verbose=verbose)
         
     
