@@ -3,7 +3,7 @@ Function to construct the latent structure
 """
 
 import warnings
-from semopy.efa import explore_cfa_model
+from semopy.efa import explore_pine_model
 from semopy import ModelEffects, Model, ModelGeneralizedEffects
 from semopy.utils import calc_reduced_ml
 
@@ -314,18 +314,33 @@ def get_structure_picea(data: Data,
     return mods
 
 
-def get_structure_optics(data_phens):
+def get_structure_optics(data_phens, std=True, **kwargs):
     """
-    Get latent structure with opticks
-    Georgy
-    :return:
+    Retrieve latent structure of the model given observations.
+
+    Applies semopy's iternal method using OPTICS and Sparse PCA.
+    Parameters
+    ----------
+    data_phens : pd.DataFrame
+        Pandas DataFrame.
+    std : bool, optional
+        If True, then data is standardized beforehand. The default is True.
+    **kwargs : dict
+        Extra arguments to semopy.efa.explore_pine_model.
+
+    Returns
+    -------
+    semopy_desc : str
+        Model description.
+
     """
-
-    semopy_descr = explore_cfa_model(data_phens)
-    showl(semopy_descr)
-
-
-    pass
+    
+    if std:
+        data_phens -= data_phens.mean()
+        data_phens /= data_phens.std()
+    semopy_desc = explore_pine_model(data_phens, **kwargs)
+    showl(semopy_desc)
+    return semopy_desc
 
 
 def get_structure_prior():
